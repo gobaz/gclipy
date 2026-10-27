@@ -21,6 +21,11 @@
       <default>true</default>
       <summary>Replace the existing entry instead of adding a second one</summary>
     </key>
+    <key name="record-images" type="b">
+      <default>true</default>
+      <summary>Record copied images</summary>
+      <description>Images are kept as PNG files in ~/.local/share/gclippy/images. Text is recorded instead when a copy offers both.</description>
+    </key>
     <key name="ignore-concealed" type="b">
       <default>false</default>
       <summary>Ignore content that password managers mark as secret</summary>
@@ -88,6 +93,20 @@
     <key name="show-clear-history-item" type="b">
       <default>true</default>
       <summary>Show "Clear History" in the main menu</summary>
+    </key>
+    <key name="show-images" type="b">
+      <default>true</default>
+      <summary>Show image thumbnails in the menu</summary>
+    </key>
+    <key name="thumbnail-width" type="i">
+      <range min="16" max="512"/>
+      <default>100</default>
+      <summary>Maximum thumbnail width</summary>
+    </key>
+    <key name="thumbnail-height" type="i">
+      <range min="16" max="512"/>
+      <default>32</default>
+      <summary>Maximum thumbnail height</summary>
     </key>
     <key name="show-tooltips" type="b">
       <default>true</default>

@@ -7,6 +7,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {HistoryStore, itemsFromJSON} from './lib/historyStore.js';
+import {ImageStore} from './lib/images.js';
 import {buildHistoryNodes, buildMainMenu, buildSnippetNodes} from './lib/menuModel.js';
 import {historyAction, matchesApp} from './lib/paste.js';
 import {EXAMPLE_SNIPPETS, parseSnippets} from './lib/snippetStore.js';
@@ -20,11 +21,15 @@ import {Paster} from './shell/paster.js';
 import {PointerMenu} from './shell/pointerMenu.js';
 
 const SNIPPETS_RELOAD_DELAY_MS = 300;
+const IMAGE_CLEANUP_DELAY_S = 2;
+// Larger clipboard images are skipped rather than written to disk on every copy.
+const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
 
 // Settings that only need the menus rebuilt; any other key has its own handler below.
 const MENU_KEYS = new Set([
     'reorder-after-paste', 'show-icons', 'snippets-above-history', 'inline-limit', 'folder-limit', 'max-title-length',
     'mark-numbers', 'start-at-zero', 'show-clear-history-item', 'show-tooltips', 'max-tooltip-length',
+    'show-images', 'thumbnail-width', 'thumbnail-height',
 ]);
 
 export default class GclippyExtension extends Extension {
@@ -42,7 +47,15 @@ export default class GclippyExtension extends Extension {
         this._folders = this._loadSnippets();
         this._watchSnippets(dataDir);
 
-        this._monitor = new ClipboardMonitor(clip => this._onClip(clip));
+        this._images = new ImageStore(GLib.build_filenamev([dataDir, 'images']));
+        this._imageCancellable = new Gio.Cancellable();
+        this._imageCleanupId = 0;
+        this._cleanUpImages();
+
+        this._monitor = new ClipboardMonitor({
+            onClip: clip => this._onClip(clip).catch(e => logError(e, 'gclippy: failed to record clipboard')),
+            recordImages: () => this._settings.get_boolean('record-images'),
+        });
         this._paster = new Paster();
         this._pointerMenu = new PointerMenu();
         this._indicator = null;
@@ -63,6 +76,9 @@ export default class GclippyExtension extends Extension {
     disable() {
         this._settings.disconnectObject(this);
         this._keybindings.destroy();
+        this._imageCancellable.cancel();
+        if (this._imageCleanupId)
+            GLib.source_remove(this._imageCleanupId);
         if (this._clearTimeoutId)
             GLib.source_remove(this._clearTimeoutId);
         if (this._snippetsReloadId)
@@ -81,6 +97,7 @@ export default class GclippyExtension extends Extension {
         } catch (e) {
             logError(e, 'gclippy: failed to save history');
         }
+        this._cleanUpImages();
 
         this._settings = null;
         this._keybindings = null;
@@ -96,6 +113,9 @@ export default class GclippyExtension extends Extension {
         this._folders = null;
         this._historyFile = null;
         this._snippetsFile = null;
+        this._images = null;
+        this._imageCancellable = null;
+        this._imageCleanupId = 0;
     }
 
     // MARK: - Storage
@@ -150,21 +170,55 @@ export default class GclippyExtension extends Extension {
     _historyChanged() {
         this._historyFile.saveLater(() => this._history.toJSON());
         this._invalidateMenus();
+        // Trims, deletes and clears can leave image files behind; batch their removal.
+        if (!this._imageCleanupId) {
+            this._imageCleanupId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, IMAGE_CLEANUP_DELAY_S, () => {
+                this._imageCleanupId = 0;
+                this._cleanUpImages();
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+    }
+
+    _cleanUpImages() {
+        try {
+            this._images.collectGarbage(this._history.imageHashes());
+        } catch (e) {
+            logError(e, 'gclippy: failed to clean up images');
+        }
     }
 
     // MARK: - Clipboard
 
-    _onClip({text, concealed, wmClass, appId}) {
-        if (concealed && this._settings.get_boolean('ignore-concealed'))
+    async _onClip(clip) {
+        if (clip.concealed && this._settings.get_boolean('ignore-concealed'))
             return;
-        if (matchesApp(wmClass, appId, this._settings.get_strv('excluded-apps')))
+        if (matchesApp(clip.wmClass, clip.appId, this._settings.get_strv('excluded-apps')))
             return;
-        const added = this._history.add(text, {
+
+        let image = null;
+        if (clip.kind === 'image') {
+            if (clip.bytes.get_size() > MAX_IMAGE_BYTES)
+                return;
+            try {
+                image = await this._images.save(clip.bytes, clip.mimetype, this._imageCancellable);
+            } catch (e) {
+                if (!e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                    logError(e, 'gclippy: failed to store clipboard image');
+                return;
+            }
+            // The extension may have been disabled while the image was being written.
+            if (!this._history)
+                return;
+        }
+
+        const options = {
             allowDuplicate: this._settings.get_boolean('allow-duplicate'),
             overwriteDuplicate: this._settings.get_boolean('overwrite-duplicate'),
             maxHistory: this._settings.get_int('max-history'),
             sortByCreatedAt: this._sortByCreatedAt(),
-        });
+        };
+        const added = image ? this._history.addImage(image, options) : this._history.addText(clip.text, options);
         if (added)
             this._historyChanged();
     }
@@ -178,22 +232,46 @@ export default class GclippyExtension extends Extension {
             deleteModifier: this._settings.get_string('delete-modifier'),
             pasteDeleteModifier: this._settings.get_string('paste-delete-modifier'),
         });
-        if (action === 'paste-delete')
-            this._monitor.ignoreNextChange();
-        if (action !== 'delete')
-            this._copyAndPaste(item.text);
+        if (action !== 'delete') {
+            if (action === 'paste-delete')
+                this._monitor.ignoreNextChange();
+            if (!this._copyItem(item))
+                return;
+            this._pasteSoon();
+        }
         if (action !== 'paste' && this._history.delete(id))
             this._historyChanged();
     }
 
-    _onSnippetSelected(id) {
-        const snippet = this._folders.flatMap(folder => folder.snippets).find(s => s.id === id);
-        if (snippet)
-            this._copyAndPaste(snippet.content);
+    /** @returns {boolean} false when an image file is missing and the item was dropped */
+    _copyItem(item) {
+        if (item.kind !== 'image') {
+            this._monitor.setText(item.text);
+            return true;
+        }
+        let bytes;
+        try {
+            bytes = this._images.load(item.hash);
+        } catch (e) {
+            logError(e, 'gclippy: image file missing');
+            Main.notify('gclippy', 'This image is no longer available and was removed from history.');
+            if (this._history.delete(item.id))
+                this._historyChanged();
+            return false;
+        }
+        this._monitor.setImage(bytes);
+        return true;
     }
 
-    _copyAndPaste(text) {
-        this._monitor.setText(text);
+    _onSnippetSelected(id) {
+        const snippet = this._folders.flatMap(folder => folder.snippets).find(s => s.id === id);
+        if (!snippet)
+            return;
+        this._monitor.setText(snippet.content);
+        this._pasteSoon();
+    }
+
+    _pasteSoon() {
         if (this._settings.get_boolean('paste-automatically'))
             this._paster.pasteSoon(this._settings.get_strv('terminal-wm-classes'));
     }
@@ -280,7 +358,14 @@ export default class GclippyExtension extends Extension {
             onHistory: (id, event) => this._onHistorySelected(id, event),
             onSnippet: id => this._onSnippetSelected(id),
             onAction: action => this._onAction(action),
-        }, {showIcons: this._settings.get_boolean('show-icons')});
+        }, {
+            showIcons: this._settings.get_boolean('show-icons'),
+            thumbnails: this._settings.get_boolean('show-images') ? {
+                width: this._settings.get_int('thumbnail-width'),
+                height: this._settings.get_int('thumbnail-height'),
+                uri: hash => this._images.thumbnailFile(hash).get_uri(),
+            } : null,
+        });
     }
 
     _popUp(kind) {

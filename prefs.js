@@ -46,6 +46,8 @@ function generalPage(settings) {
     history.add(switchRow(settings, 'reorder-after-paste', 'Move pasted items to the top'));
     history.add(switchRow(settings, 'allow-duplicate', 'Record items already in history'));
     history.add(switchRow(settings, 'overwrite-duplicate', 'Replace the existing entry for duplicates'));
+    history.add(switchRow(settings, 'record-images', 'Record images',
+        'Copies that also contain text are recorded as text'));
     history.add(switchRow(settings, 'ignore-concealed', 'Ignore passwords marked as secret',
         'Skips copies that password managers flag as concealed'));
     page.add(history);
@@ -87,6 +89,13 @@ function menuPage(settings) {
     items.add(switchRow(settings, 'mark-numbers', 'Number items'));
     items.add(switchRow(settings, 'start-at-zero', 'Start numbering at 0'));
     items.add(switchRow(settings, 'show-icons', 'Show icons'));
+    items.add(switchRow(settings, 'show-images', 'Show image thumbnails'));
+    const thumbnailWidth = spinRow(settings, 'thumbnail-width', 'Thumbnail width', 16, 512);
+    const thumbnailHeight = spinRow(settings, 'thumbnail-height', 'Thumbnail height', 16, 512);
+    for (const row of [thumbnailWidth, thumbnailHeight]) {
+        settings.bind('show-images', row, 'sensitive', Gio.SettingsBindFlags.GET);
+        items.add(row);
+    }
     items.add(switchRow(settings, 'show-tooltips', 'Preview the highlighted item'));
     items.add(spinRow(settings, 'max-tooltip-length', 'Maximum preview length', 1, 10000));
     page.add(items);

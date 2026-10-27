@@ -13,6 +13,15 @@ export function assertEqual(actual, expected, message = '') {
         throw new Error(`${message ? `${message}: ` : ''}expected ${e}, got ${a}`);
 }
 
+export async function assertRejects(promise, message = '') {
+    try {
+        await promise;
+    } catch {
+        return;
+    }
+    throw new Error(`${message ? `${message}: ` : ''}expected a rejection`);
+}
+
 export function assertThrows(fn, errorClass, message = '') {
     try {
         fn();
@@ -24,12 +33,12 @@ export function assertThrows(fn, errorClass, message = '') {
     throw new Error(`${message ? `${message}: ` : ''}expected an exception`);
 }
 
-/** @returns {number} number of failed tests */
-export function runAll() {
+/** @returns {Promise<number>} number of failed tests */
+export async function runAll() {
     let failed = 0;
     for (const {name, fn} of tests) {
         try {
-            fn();
+            await fn();
             print(`ok   ${name}`);
         } catch (e) {
             failed++;

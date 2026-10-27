@@ -10,8 +10,12 @@ the same extension API, but those versions are untested.
 
 ## Features
 
-- Text clipboard history, newest first, with Clipy's duplicate handling
-  (record or ignore duplicates, move a re-copied item to the top).
+- Clipboard history of text and images, newest first, with Clipy's duplicate
+  handling (record or ignore duplicates, move a re-copied item to the top).
+- Images (screenshots, "Copy Image" in browsers, image editors) are listed as
+  "(Image) W×H" with a thumbnail and are pasted back as PNG. When a copy offers
+  both text and an image, as spreadsheets and office apps do, the text is
+  recorded.
 - Snippet folders, read from `~/.local/share/gclippy/snippets.json`.
 - Clipy's menu layout:
   - numbered items, with history grouped into "1 - 10", "11 - 20"… submenus
@@ -25,8 +29,8 @@ the same extension API, but those versions are untested.
 - Clearing history manually (with confirmation), periodically, or when the
   extension is disabled.
 
-Not in this version: images in history, a graphical snippet editor, and
-importing Clipy snippet exports.
+Not in this version: a graphical snippet editor, and importing Clipy snippet
+exports.
 
 ## Shortcuts
 
@@ -80,7 +84,10 @@ previous snippets stay in the menu. `title` defaults to the content and
 }
 ```
 
-History is stored in `~/.local/share/gclippy/history.json`. If that file
+History is stored in `~/.local/share/gclippy/history.json`. Images are kept
+next to it in `images/` as `<sha256>.png` plus a `.thumb.png` for the menu. They
+are deleted once no history entry refers to them, and copies larger than 32 MiB
+are skipped. If `history.json`
 becomes unreadable, gclippy renames it to `history.json.corrupt-<time>` and
 starts a new history.
 
@@ -99,7 +106,8 @@ tests/    unit tests for lib/, plus a headless shell smoke test
   toggles settings, and disables and re-enables gclippy. It does not touch
   your running session.
   - `SMOKE_SCREENSHOT=/path.png make smoke` also saves a screenshot with the
-    prefs window open.
+    prefs window open, and `SMOKE_MENU_SCREENSHOT=/path.png` one of the history
+    menu with image thumbnails.
   - `KEEP_LOG=1` keeps the shell log.
 - Watch logs from the real session with `journalctl -f /usr/bin/gnome-shell`.
 

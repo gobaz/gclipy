@@ -6,6 +6,8 @@ import St from 'gi://St';
 
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
+import {fitWithin} from '../lib/images.js';
+
 /**
  * @typedef {object} MenuHandlers
  * @property {(id: string, event: Clutter.Event) => void} onHistory
@@ -21,11 +23,13 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
  * @param {MenuHandlers} handlers
  * @param {object} options
  * @param {boolean} options.showIcons
+ * @param {{width: number, height: number, uri: (hash: string) => string} | null} options.thumbnails
+ *   null hides image thumbnails
  */
-export function renderMenu(menu, nodes, handlers, {showIcons}) {
+export function renderMenu(menu, nodes, handlers, {showIcons, thumbnails}) {
     menu.removeAll();
     const preview = new PreviewItem();
-    addNodes(menu, nodes, handlers, {showIcons, preview});
+    addNodes(menu, nodes, handlers, {showIcons, thumbnails, preview});
     // A menu holding only labels counts as empty and refuses to open, so say so explicitly.
     if (menu.isEmpty())
         menu.addMenuItem(new PopupMenu.PopupMenuItem('No items', {reactive: false, can_focus: false}));
@@ -52,6 +56,8 @@ function addNodes(menu, nodes, handlers, context) {
         }
         case 'history': {
             const item = new PopupMenu.PopupMenuItem(node.title);
+            if (node.image && context.thumbnails)
+                item.add_child(thumbnail(context.thumbnails, node.image));
             item.connect('activate', (_item, event) => handlers.onHistory(node.id, event));
             context.preview.track(item, node.tooltip);
             menu.addMenuItem(item);
@@ -74,6 +80,18 @@ function addNodes(menu, nodes, handlers, context) {
         }
         }
     }
+}
+
+function thumbnail({width: maxWidth, height: maxHeight, uri}, image) {
+    // St cannot centre a background, so the widget takes the image's own aspect ratio
+    // within the configured box and the thumbnail file is scaled to fill it.
+    const [width, height] = fitWithin(image.width, image.height, maxWidth, maxHeight);
+    return new St.Widget({
+        style: `background-image: url("${uri(image.hash)}"); background-size: ${width}px ${height}px; ` +
+            `width: ${width}px; height: ${height}px;`,
+        x_align: Clutter.ActorAlign.END,
+        x_expand: true,
+    });
 }
 
 class PreviewItem extends PopupMenu.PopupMenuSection {

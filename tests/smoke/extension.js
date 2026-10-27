@@ -2,6 +2,7 @@
 // Results are logged as "SMOKE ok|FAIL <name>" lines followed by "SMOKE DONE".
 
 import Clutter from 'gi://Clutter';
+import GdkPixbuf from 'gi://GdkPixbuf';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
@@ -31,6 +32,19 @@ async function waitFor(predicate, timeoutMs = 5000) {
         await wait(50);
     }
     return predicate();
+}
+
+const clipboardContent = mimetype => new Promise(resolve => {
+    // Copy: the callback's bytes are freed when it returns.
+    St.Clipboard.get_default().get_content(St.ClipboardType.CLIPBOARD, mimetype,
+        (_clipboard, bytes) => resolve(bytes ? new GLib.Bytes(bytes.toArray()) : null));
+});
+
+function makeImage(width, height, format) {
+    const pixbuf = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, false, 8, width, height);
+    pixbuf.fill(format === 'png' ? 0xe95420ff : 0x2a7de1ff);
+    const [, buffer] = pixbuf.save_to_bufferv(format, [], []);
+    return new GLib.Bytes(buffer);
 }
 
 const clipboardText = () => new Promise(resolve => {
@@ -173,11 +187,83 @@ export default class SmokeExtension extends Extension {
             JSON.stringify(labels(gclippy._pointerMenu.menu)));
         gclippy._pointerMenu.menu.close();
 
+        await this._testImages(gclippy, settings);
+
         gclippy.openPreferences();
         await wait(3000);
         // SMOKE_SCREENSHOT=path saves the screen with the prefs window for a visual check.
         const screenshotPath = GLib.getenv('SMOKE_SCREENSHOT');
         if (screenshotPath)
             await saveScreenshot(screenshotPath);
+    }
+
+    async _testImages(gclippy, settings) {
+        const clipboard = St.Clipboard.get_default();
+        const firstImage = () => gclippy._history.sorted(false).find(item => item.kind === 'image');
+
+        clipboard.set_content(St.ClipboardType.CLIPBOARD, 'image/png', makeImage(400, 100, 'png'));
+        await waitFor(() => firstImage());
+        const png = firstImage();
+        check('copied PNG is recorded', png?.width === 400 && png?.height === 100, JSON.stringify(png));
+        check('PNG and thumbnail files written', !!png &&
+            gclippy._images.imageFile(png.hash).query_exists(null) &&
+            gclippy._images.thumbnailFile(png.hash).query_exists(null));
+
+        clipboard.set_content(St.ClipboardType.CLIPBOARD, 'image/jpeg', makeImage(300, 150, 'jpeg'));
+        await waitFor(() => firstImage()?.width === 300);
+        const jpeg = firstImage();
+        check('copied JPEG is stored as PNG', jpeg?.height === 150 &&
+            gclippy._images.load(jpeg.hash).toArray()[1] === 80, JSON.stringify(jpeg));
+
+        clipboard.set_text(St.ClipboardType.CLIPBOARD, 'smoke text after images');
+        await wait(300);
+
+        gclippy._popUp('history');
+        await wait(300);
+        const menuItems = gclippy._pointerMenu.menu._getMenuItems();
+        const imageItems = menuItems.filter(item => item.label?.text.includes('(Image)'));
+        check('menu lists images with titles', JSON.stringify(imageItems.map(item => item.label.text)) ===
+            JSON.stringify(['2. (Image) 300×150', '3. (Image) 400×100']),
+        JSON.stringify(menuItems.map(item => item.label?.text)));
+        check('image items have thumbnails', imageItems.length === 2 && imageItems.every(item => item.get_n_children() > 2));
+        // SMOKE_MENU_SCREENSHOT=path saves the open menu with thumbnails for a visual check.
+        const menuScreenshot = GLib.getenv('SMOKE_MENU_SCREENSHOT');
+        if (menuScreenshot)
+            await saveScreenshot(menuScreenshot);
+        gclippy._pointerMenu.menu.close();
+
+        gclippy._onHistorySelected(png.id, null);
+        await wait(300);
+        const pasted = await clipboardContent('image/png');
+        check('selecting an image puts the PNG on the clipboard',
+            !!pasted && GLib.compute_checksum_for_bytes(GLib.ChecksumType.SHA256, pasted) === png.hash);
+        check('selected image moves to the top without a duplicate',
+            gclippy._history.sorted(false)[0].id === png.id &&
+            gclippy._history.sorted(false).filter(item => item.kind === 'image').length === 2);
+
+        settings.set_boolean('show-images', false);
+        gclippy._popUp('history');
+        const plainItems = gclippy._pointerMenu.menu._getMenuItems().filter(item => item.label?.text.includes('(Image)'));
+        check('show-images=false hides thumbnails', plainItems.length === 2 && plainItems.every(item => item.get_n_children() === 2),
+            JSON.stringify(plainItems.map(item => item.get_n_children())));
+        gclippy._pointerMenu.menu.close();
+        settings.reset('show-images');
+
+        settings.set_boolean('record-images', false);
+        clipboard.set_content(St.ClipboardType.CLIPBOARD, 'image/png', makeImage(50, 50, 'png'));
+        await wait(500);
+        check('record-images=false skips images', !gclippy._history.sorted(false).some(item => item.width === 50));
+        settings.reset('record-images');
+
+        settings.set_string('delete-modifier', 'shift');
+        gclippy._onHistorySelected(jpeg.id, {get_state: () => Clutter.ModifierType.SHIFT_MASK});
+        settings.reset('delete-modifier');
+        const removed = await waitFor(() => !gclippy._images.imageFile(jpeg.hash).query_exists(null) &&
+            !gclippy._images.thumbnailFile(jpeg.hash).query_exists(null));
+        check('deleting an image removes its files', removed && gclippy._images.imageFile(png.hash).query_exists(null));
+
+        gclippy._images.imageFile(png.hash).delete(null);
+        gclippy._onHistorySelected(png.id, null);
+        check('missing image file drops the entry', !gclippy._history.get(png.id));
     }
 }
