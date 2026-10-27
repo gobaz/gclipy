@@ -57,6 +57,7 @@ export const SideSubmenuItem = GObject.registerClass({
         /** Stands in for a menu when the preview panel positions itself beside this submenu. */
         this.panelMenu = {actor: this._panel};
 
+        this._onLeft = false;
         this._openId = 0;
         this._closeId = 0;
         this._laterId = 0;
@@ -90,6 +91,10 @@ export const SideSubmenuItem = GObject.registerClass({
             [parent, parent.connect('active-changed', (_menu, item) => {
                 if (item === this) {
                     this._clearTimer('_closeId');
+                    // Selected with the keyboard: show what is inside at once, leaving focus here.
+                    // Hovering opens after a delay instead (notify::hover).
+                    if (!this.hover)
+                        this.setSubmenuShown(true);
                     return;
                 }
                 this._clearTimer('_openId');
@@ -98,12 +103,14 @@ export const SideSubmenuItem = GObject.registerClass({
             })]);
     }
 
-    /** Clicking or pressing Enter/Space toggles the panel instead of closing the menu. */
-    activate(event) {
-        const opening = !this.isSubmenuOpen;
-        this.setSubmenuShown(opening);
-        if (opening && event?.type() === Clutter.EventType.KEY_PRESS)
-            this._focusFirstItem();
+    /** Clicking or pressing Enter/Space enters the panel instead of closing the menu. */
+    activate(_event) {
+        this._enter();
+    }
+
+    _enter() {
+        this.setSubmenuShown(true);
+        this._focusFirstItem();
     }
 
     /** @param {boolean} open */
@@ -153,7 +160,8 @@ export const SideSubmenuItem = GObject.registerClass({
         const padding = this._panel.get_theme_node().get_padding(St.Side.TOP);
 
         let x = menuX + menuWidth - OVERLAP;
-        if (x + width > monitor.x + monitor.width)
+        this._onLeft = x + width > monitor.x + monitor.width;
+        if (this._onLeft)
             x = menuX - width + OVERLAP;
         const y = Math.max(monitor.y, Math.min(itemY - padding, monitor.y + monitor.height - height));
         const position = [x - holderX, y - holderY];
@@ -169,9 +177,9 @@ export const SideSubmenuItem = GObject.registerClass({
 
     _onItemKey(event) {
         const key = event.get_key_symbol();
-        if (key === Clutter.KEY_Right) {
-            this.setSubmenuShown(true);
-            this._focusFirstItem();
+        // The arrow pointing at the panel enters it; the panel flips left near the screen edge.
+        if (key === (this._onLeft ? Clutter.KEY_Left : Clutter.KEY_Right)) {
+            this._enter();
             return Clutter.EVENT_STOP;
         }
         // Close before the menu moves the focus, so Up/Down go to the neighbouring menu item
@@ -181,10 +189,10 @@ export const SideSubmenuItem = GObject.registerClass({
         return Clutter.EVENT_PROPAGATE;
     }
 
+    /** The arrow pointing back at the menu returns to the folder, which keeps showing the panel. */
     _onPanelKey(event) {
-        if (event.get_key_symbol() !== Clutter.KEY_Left)
+        if (event.get_key_symbol() !== (this._onLeft ? Clutter.KEY_Right : Clutter.KEY_Left))
             return Clutter.EVENT_PROPAGATE;
-        this.setSubmenuShown(false);
         this.grab_key_focus();
         return Clutter.EVENT_STOP;
     }

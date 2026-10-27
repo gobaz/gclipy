@@ -446,6 +446,8 @@ export default class SmokeExtension extends Extension {
         await open();
         const first = folder('4 - 5');
         check('side submenu: focus starts on the first folder', focused() === first);
+        check('a folder selected with the keyboard shows its contents and keeps focus',
+            first.isSubmenuOpen && focused() === first);
         await tap(Clutter.KEY_Right);
         const panel = first._panel;
         const [menuX] = menu.actor.get_transformed_position();
@@ -465,15 +467,15 @@ export default class SmokeExtension extends Extension {
         await tap(Clutter.KEY_Down);
         check('Down at the end stays inside the side panel', panel.contains(focused()));
         await tap(Clutter.KEY_Left);
-        check('Left closes the side panel and returns to the folder', !first.isSubmenuOpen && focused() === first);
+        check('Left returns to the folder, which keeps showing its contents',
+            first.isSubmenuOpen && focused() === first);
 
-        await tap(Clutter.KEY_Right);
-        first.grab_key_focus();
         await tap(Clutter.KEY_Down);
-        check('Down on an open folder moves to the next menu item and closes the panel',
-            focused() === folder('6 - 7') && !first.isSubmenuOpen, focused()?.label?.text);
+        check('Down moves to the next folder, closing the first and showing the next',
+            focused() === folder('6 - 7') && !first.isSubmenuOpen && folder('6 - 7').isSubmenuOpen,
+            focused()?.label?.text);
         await tap(Clutter.KEY_Return);
-        check('Enter opens a folder', folder('6 - 7').isSubmenuOpen && focused()?.label?.text === '6. t1');
+        check('Enter enters a folder', folder('6 - 7').isSubmenuOpen && focused()?.label?.text === '6. t1');
         await tap(Clutter.KEY_Return);
         check('Enter on an item inside pastes it and closes the menu', !menu.isOpen && await clipboardText() === 't1');
 
@@ -494,7 +496,8 @@ export default class SmokeExtension extends Extension {
 
         await open();
         await click(folder('4 - 5'));
-        check('clicking a folder toggles it without closing the menu', menu.isOpen && folder('4 - 5').isSubmenuOpen);
+        check('clicking a folder enters it without closing the menu', menu.isOpen &&
+            folder('4 - 5').isSubmenuOpen && folder('4 - 5')._panel.contains(focused()));
         menu.close();
         await wait(200);
         check('closing the menu closes its side panel', !folder('4 - 5')?.isSubmenuOpen);

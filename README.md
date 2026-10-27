@@ -25,8 +25,10 @@ the same extension API, but those versions are untested.
   - the 5 most recent items shown directly in the menu (configurable)
   - in the main menu: Pinned, then Snippet, then History (snippets can be moved
     after History in settings)
-  - folders (history ranges and snippet folders) open beside the menu, by
-    hovering or with Right/Enter; Left goes back
+  - folders (history ranges and snippet folders) show their contents beside
+    the menu as soon as they are selected with the keyboard (or hovered);
+    Right, Enter or a click moves into them, Left goes back. When the panel
+    opens on the left near the screen edge, the arrows swap.
 - Pinned items: click the pin icon on a history item, or press Ctrl+P while it
   is highlighted, to keep it in a "Pinned" section above History. Pins are
   never removed by Clear History, periodic clearing or the history size limit.
