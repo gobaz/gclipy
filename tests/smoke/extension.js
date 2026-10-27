@@ -193,6 +193,7 @@ export default class SmokeExtension extends Extension {
         await this._testNumberKeys(gclippy, settings);
         await this._testPreview(gclippy);
         gclippy = await this._testReorder(gclippy, settings);
+        await this._testStartFocus(gclippy, settings);
 
         gclippy.openPreferences();
         await wait(3000);
@@ -324,6 +325,53 @@ export default class SmokeExtension extends Extension {
         return gclippy;
     }
 
+    async _testStartFocus(gclippy, settings) {
+        const clipboard = St.Clipboard.get_default();
+        const menu = gclippy._pointerMenu.menu;
+        const focused = () => global.stage.get_key_focus()?.label?.text;
+        const openAndRead = async kind => {
+            gclippy._popUp(kind);
+            await wait(200);
+            const label = focused();
+            menu.close();
+            await wait(100);
+            return label;
+        };
+
+        // Only pins so far (ra, rc, rb from the reorder test): nothing in History, so the first item.
+        check('without history, focus starts on the first item', await openAndRead('history') === '1. ra');
+
+        for (const text of ['s1', 's2']) {
+            clipboard.set_text(St.ClipboardType.CLIPBOARD, text);
+            await wait(300);
+        }
+        check('focus starts on the first History item, after the pins', await openAndRead('history') === '4. s2');
+
+        settings.set_boolean('snippets-above-history', true);
+        check('main menu skips snippets above history too', await openAndRead('main') === '4. s2');
+        settings.reset('snippets-above-history');
+
+        settings.set_int('inline-limit', 0);
+        check('first History item in a folder: focus the folder', await openAndRead('history') === '4 - 5');
+        settings.reset('inline-limit');
+
+        check('snippets menu starts on its first item', await openAndRead('snippets') === 'Examples');
+
+        // Park the pointer away from the top bar menu, where an earlier test left it; hovering an
+        // item rightly takes the focus.
+        const pointer = Clutter.get_default_backend().get_default_seat()
+            .create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), 10, 700);
+        await wait(100);
+        pointer.run_dispose();
+        const panelMenu = gclippy._indicator.menu;
+        panelMenu.open();
+        await wait(200);
+        check('top bar menu also starts on the first History item', focused() === '4. s2', focused());
+        panelMenu.close();
+        await wait(100);
+    }
+
     async _testReorder(gclippy, settings) {
         const clipboard = St.Clipboard.get_default();
         const seat = Clutter.get_default_backend().get_default_seat();
@@ -426,10 +474,10 @@ export default class SmokeExtension extends Extension {
         await wait(100);
         gclippy._popUp('history');
         await wait(400);
-        // The first item is highlighted as the menu opens, before it has been laid out.
-        const first = menu._getMenuItems().find(item => item.label?.text.startsWith('1. '));
+        // An item is highlighted as the menu opens, before it has been laid out.
+        const first = global.stage.get_key_focus();
         const [, firstY] = first.get_transformed_position();
-        check('preview for the first item after opening is placed', preview.visible &&
+        check('preview for the item focused on opening is placed', preview.visible &&
             Number.isFinite(preview.x) && Math.abs(preview.y - firstY) < 2, `preview ${preview.x},${preview.y} item y=${firstY}`);
         const [menuX, menuY] = menu.actor.get_transformed_position();
         const [menuWidth, menuHeight] = menu.actor.get_transformed_size();

@@ -25,9 +25,8 @@ export class PointerMenu {
             this.menu.close(BoxPointer.PopupAnimation.NONE);
         const [x, y] = global.get_pointer();
         this._anchor.set_position(x, y);
+        // The extension focuses an item when the menu reports it opened.
         this.menu.open(BoxPointer.PopupAnimation.FULL);
-        // Focus the first item so the menu works from the keyboard straight away.
-        this.menu.actor.navigate_focus(null, St.DirectionType.TAB_FORWARD, false);
     }
 
     destroy() {

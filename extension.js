@@ -3,6 +3,7 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import St from 'gi://St';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -63,8 +64,12 @@ export default class GclippyExtension extends Extension {
         this._paster = new Paster();
         // Number to history item id for each rendered menu, used by the number keys.
         this._menuNumbers = new Map();
+        // Where keyboard focus goes when each menu opens: its first History item.
+        this._menuStart = new Map();
         // Shell menus have no tooltips; this panel beside the open menu stands in for them.
         this._preview = new PreviewPanel();
+        // PointerMenu registers with its menu manager first, so the manager's modal grab runs
+        // before _watchMenu's open handler moves focus to an item.
         this._pointerMenu = new PointerMenu();
         this._watchMenu(this._pointerMenu.menu);
         this._indicator = null;
@@ -127,6 +132,7 @@ export default class GclippyExtension extends Extension {
         this._historyFile = null;
         this._snippetsFile = null;
         this._menuNumbers = null;
+        this._menuStart = null;
         this._images = null;
         this._imageCancellable = null;
         this._imageCleanupId = 0;
@@ -375,7 +381,7 @@ export default class GclippyExtension extends Extension {
             snippets: () => buildSnippetNodes(this._folders, options),
         }[kind]();
         this._menuNumbers.set(menu, historyNumbers(nodes));
-        return renderMenu(menu, nodes, {
+        const items = renderMenu(menu, nodes, {
             onHistory: (id, event) => this._onHistorySelected(id, pressedModifiers(event)),
             onPin: (id, pinned) => {
                 if (this._history.setPinned(id, pinned)) {
@@ -401,6 +407,9 @@ export default class GclippyExtension extends Extension {
                 uri: hash => this._images.thumbnailFile(hash).get_uri(),
             } : null,
         });
+        const firstRecent = kind === 'snippets' ? null : history.recent[0];
+        this._menuStart.set(menu, firstRecent ? items.get(firstRecent.id) ?? null : null);
+        return items;
     }
 
     /**
@@ -445,15 +454,18 @@ export default class GclippyExtension extends Extension {
         const show = this._settings.get_boolean('show-indicator');
         if (show && !this._indicator) {
             this._indicator = createIndicator();
-            this._watchMenu(this._indicator.menu);
             this._indicator.menu.connect('open-state-changed', (_menu, open) => {
                 if (!open && this._indicatorDirty)
                     this._renderIndicator();
             });
             this._renderIndicator();
             Main.panel.addToStatusArea(this.uuid, this._indicator);
+            // After addToStatusArea, so the panel's menu manager has taken its modal grab (which
+            // moves focus to the menu) before _watchMenu focuses the first History item.
+            this._watchMenu(this._indicator.menu);
         } else if (!show && this._indicator) {
             this._menuNumbers.delete(this._indicator.menu);
+            this._menuStart.delete(this._indicator.menu);
             this._indicator.destroy();
             this._indicator = null;
         }
@@ -462,9 +474,23 @@ export default class GclippyExtension extends Extension {
     _watchMenu(menu) {
         menu.actor.connect('key-press-event', (_actor, event) => this._onMenuKey(menu, event));
         menu.connect('open-state-changed', (_menu, open) => {
-            if (!open)
+            if (open)
+                this._focusMenuStart(menu);
+            else
                 this._preview.hide();
         });
+    }
+
+    /**
+     * Put keyboard focus on the first History item, skipping pinned items and snippets, so Enter
+     * pastes the latest copy. An item inside a collapsed range folder is reached through the folder.
+     */
+    _focusMenuStart(menu) {
+        const start = this._menuStart.get(menu);
+        if (start)
+            (start.folder ?? start.item).grab_key_focus();
+        else
+            menu.actor.navigate_focus(null, St.DirectionType.TAB_FORWARD, false);
     }
 
     _onMenuKey(menu, event) {
