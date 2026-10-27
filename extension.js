@@ -348,7 +348,7 @@ export default class GclippyExtension extends Extension {
 
     _render(menu, kind) {
         const options = this._menuOptions();
-        const history = this._history.sorted(this._sortByCreatedAt());
+        const history = {pinned: this._history.pinned(), recent: this._history.unpinned(this._sortByCreatedAt())};
         const nodes = {
             main: () => buildMainMenu(history, this._folders, options),
             history: () => buildHistoryNodes(history, options),
@@ -356,6 +356,10 @@ export default class GclippyExtension extends Extension {
         }[kind]();
         renderMenu(menu, nodes, {
             onHistory: (id, event) => this._onHistorySelected(id, event),
+            onPin: (id, pinned) => {
+                if (this._history.setPinned(id, pinned))
+                    this._historyChanged();
+            },
             onSnippet: id => this._onSnippetSelected(id),
             onAction: action => this._onAction(action),
         }, {

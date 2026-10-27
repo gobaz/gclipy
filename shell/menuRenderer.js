@@ -11,6 +11,7 @@ import {fitWithin} from '../lib/images.js';
 /**
  * @typedef {object} MenuHandlers
  * @property {(id: string, event: Clutter.Event) => void} onHistory
+ * @property {(id: string, pinned: boolean) => void} onPin
  * @property {(id: string) => void} onSnippet
  * @property {(action: string) => void} onAction
  */
@@ -56,8 +57,11 @@ function addNodes(menu, nodes, handlers, context) {
         }
         case 'history': {
             const item = new PopupMenu.PopupMenuItem(node.title);
+            // Push the thumbnail and pin button to the right edge.
+            item.label.x_expand = true;
             if (node.image && context.thumbnails)
                 item.add_child(thumbnail(context.thumbnails, node.image));
+            addPinButton(item, node, handlers.onPin);
             item.connect('activate', (_item, event) => handlers.onHistory(node.id, event));
             context.preview.track(item, node.tooltip);
             menu.addMenuItem(item);
@@ -82,6 +86,37 @@ function addNodes(menu, nodes, handlers, context) {
     }
 }
 
+/**
+ * A pin toggle at the end of a history item, also reachable with Ctrl+P on the focused item.
+ * The menu is not rebuilt on toggle, so the item moves section the next time the menu opens.
+ */
+function addPinButton(item, node, onPin) {
+    const icon = new St.Icon({icon_name: 'view-pin-symbolic', style_class: 'popup-menu-icon'});
+    // Not focusable, so arrow keys keep moving between items rather than stopping on buttons.
+    const button = new St.Button({child: icon, can_focus: false, style: 'padding: 0 0 0 8px;', y_align: Clutter.ActorAlign.CENTER});
+    let pinned = node.pinned;
+    const update = () => {
+        icon.opacity = pinned ? 255 : 80;
+        button.accessible_name = pinned ? 'Unpin' : 'Pin';
+    };
+    const toggle = () => {
+        pinned = !pinned;
+        update();
+        onPin(node.id, pinned);
+    };
+    update();
+    button.connect('clicked', toggle);
+    item.connect('key-press-event', (_item, event) => {
+        const control = (event.get_state() & Clutter.ModifierType.CONTROL_MASK) !== 0;
+        const key = event.get_key_symbol();
+        if (!control || (key !== Clutter.KEY_p && key !== Clutter.KEY_P))
+            return Clutter.EVENT_PROPAGATE;
+        toggle();
+        return Clutter.EVENT_STOP;
+    });
+    item.add_child(button);
+}
+
 function thumbnail({width: maxWidth, height: maxHeight, uri}, image) {
     // St cannot centre a background, so the widget takes the image's own aspect ratio
     // within the configured box and the thumbnail file is scaled to fill it.
@@ -89,8 +124,7 @@ function thumbnail({width: maxWidth, height: maxHeight, uri}, image) {
     return new St.Widget({
         style: `background-image: url("${uri(image.hash)}"); background-size: ${width}px ${height}px; ` +
             `width: ${width}px; height: ${height}px;`,
-        x_align: Clutter.ActorAlign.END,
-        x_expand: true,
+        y_align: Clutter.ActorAlign.CENTER,
     });
 }
 

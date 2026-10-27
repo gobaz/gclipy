@@ -66,6 +66,8 @@ function saveScreenshot(path) {
     });
 }
 
+const hasThumbnail = item => item.get_children().some(child => child.style?.includes('background-image'));
+
 const labels = menu => menu._getMenuItems()
     .filter(item => item.label && item.visible)
     .map(item => item.label.text);
@@ -188,6 +190,7 @@ export default class SmokeExtension extends Extension {
         gclippy._pointerMenu.menu.close();
 
         await this._testImages(gclippy, settings);
+        gclippy = await this._testPins(gclippy, settings);
 
         gclippy.openPreferences();
         await wait(3000);
@@ -195,6 +198,103 @@ export default class SmokeExtension extends Extension {
         const screenshotPath = GLib.getenv('SMOKE_SCREENSHOT');
         if (screenshotPath)
             await saveScreenshot(screenshotPath);
+    }
+
+    async _testPins(gclippy, settings) {
+        const clipboard = St.Clipboard.get_default();
+        const seat = Clutter.get_default_backend().get_default_seat();
+        const pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        const keyboard = seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        const menu = () => gclippy._pointerMenu.menu;
+        const itemFor = text => menu()._getMenuItems().find(item => item.label?.text.endsWith(text));
+        const idOf = text => gclippy._history.sorted(false).find(item => item.text === text)?.id;
+
+        clipboard.set_text(St.ClipboardType.CLIPBOARD, 'pin me');
+        await wait(300);
+        clipboard.set_text(St.ClipboardType.CLIPBOARD, 'other');
+        await wait(300);
+
+        // Click the pin button of "pin me" with a real (virtual) pointer.
+        gclippy._popUp('history');
+        await wait(300);
+        const button = itemFor('pin me')?.get_last_child();
+        const [x, y] = button.get_transformed_position();
+        const [width, height] = button.get_transformed_size();
+        const time = () => GLib.get_monotonic_time();
+        pointer.notify_absolute_motion(time(), x + width / 2, y + height / 2);
+        await wait(100);
+        pointer.notify_button(time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+        pointer.notify_button(time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+        await wait(300);
+        check('pin button click pins the item', gclippy._history.get(idOf('pin me'))?.pinned === true);
+        check('pin button click keeps the menu open', menu().isOpen);
+        check('pin button click does not paste', await clipboardText() === 'other');
+        menu().close();
+
+        gclippy._popUp('history');
+        const reopened = labels(menu());
+        check('pinned section above history', JSON.stringify(reopened.slice(0, 4)) ===
+            JSON.stringify(['Pinned', '1. pin me', 'History', '1. other']), JSON.stringify(reopened));
+
+        // Ctrl+P on the focused item unpins it.
+        itemFor('pin me').grab_key_focus();
+        for (const [key, state] of [[Clutter.KEY_Control_L, Clutter.KeyState.PRESSED], [Clutter.KEY_p, Clutter.KeyState.PRESSED],
+            [Clutter.KEY_p, Clutter.KeyState.RELEASED], [Clutter.KEY_Control_L, Clutter.KeyState.RELEASED]])
+            keyboard.notify_keyval(time(), key, state);
+        await wait(300);
+        check('Ctrl+P toggles the pin', gclippy._history.get(idOf('pin me'))?.pinned === false);
+        check('Ctrl+P keeps the menu open', menu().isOpen);
+        menu().close();
+
+        // Pins survive clearing and the history limit.
+        gclippy._history.setPinned(idOf('pin me'), true);
+        gclippy._historyChanged();
+        settings.set_boolean('confirm-clear-history', false);
+        gclippy._onAction('clear-history');
+        settings.reset('confirm-clear-history');
+        check('pins survive Clear History', JSON.stringify(gclippy._history.sorted(false).map(item => item.text)) ===
+            JSON.stringify(['pin me']));
+        for (const text of ['x1', 'x2', 'x3']) {
+            clipboard.set_text(St.ClipboardType.CLIPBOARD, text);
+            await wait(300);
+        }
+        settings.set_int('max-history', 1);
+        await wait(100);
+        check('pins survive the history limit', JSON.stringify(gclippy._history.sorted(false).map(item => item.text)) ===
+            JSON.stringify(['x3', 'pin me']));
+        settings.reset('max-history');
+
+        // A pinned image keeps its files through clearing and cleanup.
+        clipboard.set_content(St.ClipboardType.CLIPBOARD, 'image/png', makeImage(64, 64, 'png'));
+        await waitFor(() => gclippy._history.sorted(false).some(item => item.width === 64));
+        const image = gclippy._history.sorted(false).find(item => item.width === 64);
+        gclippy._history.setPinned(image.id, true);
+        gclippy._historyChanged();
+        gclippy._clearHistory();
+        await wait(2500);
+        check('pinned image files survive cleanup', gclippy._images.imageFile(image.hash).query_exists(null) &&
+            gclippy._images.thumbnailFile(image.hash).query_exists(null));
+
+        // SMOKE_PIN_SCREENSHOT=path saves the menu with pinned items.
+        gclippy._popUp('main');
+        await wait(300);
+        const pinScreenshot = GLib.getenv('SMOKE_PIN_SCREENSHOT');
+        if (pinScreenshot)
+            await saveScreenshot(pinScreenshot);
+        menu().close();
+
+        const ext = Main.extensionManager.lookup(UUID);
+        Main.extensionManager.disableExtension(UUID);
+        await waitFor(() => ext.state === ExtensionState.INACTIVE);
+        Main.extensionManager.enableExtension(UUID);
+        await waitFor(() => ext.state === ExtensionState.ACTIVE);
+        gclippy = ext.stateObj;
+        check('pins persist across disable and enable', JSON.stringify(gclippy._history.pinned().map(item => item.text || item.kind)) ===
+            JSON.stringify(['pin me', 'image']), JSON.stringify(gclippy._history.pinned()));
+
+        pointer.run_dispose();
+        keyboard.run_dispose();
+        return gclippy;
     }
 
     async _testImages(gclippy, settings) {
@@ -225,7 +325,7 @@ export default class SmokeExtension extends Extension {
         check('menu lists images with titles', JSON.stringify(imageItems.map(item => item.label.text)) ===
             JSON.stringify(['2. (Image) 300×150', '3. (Image) 400×100']),
         JSON.stringify(menuItems.map(item => item.label?.text)));
-        check('image items have thumbnails', imageItems.length === 2 && imageItems.every(item => item.get_n_children() > 2));
+        check('image items have thumbnails', imageItems.length === 2 && imageItems.every(hasThumbnail));
         // SMOKE_MENU_SCREENSHOT=path saves the open menu with thumbnails for a visual check.
         const menuScreenshot = GLib.getenv('SMOKE_MENU_SCREENSHOT');
         if (menuScreenshot)
@@ -244,8 +344,7 @@ export default class SmokeExtension extends Extension {
         settings.set_boolean('show-images', false);
         gclippy._popUp('history');
         const plainItems = gclippy._pointerMenu.menu._getMenuItems().filter(item => item.label?.text.includes('(Image)'));
-        check('show-images=false hides thumbnails', plainItems.length === 2 && plainItems.every(item => item.get_n_children() === 2),
-            JSON.stringify(plainItems.map(item => item.get_n_children())));
+        check('show-images=false hides thumbnails', plainItems.length === 2 && !plainItems.some(hasThumbnail));
         gclippy._pointerMenu.menu.close();
         settings.reset('show-images');
 

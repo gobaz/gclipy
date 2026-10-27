@@ -21,6 +21,10 @@ the same extension API, but those versions are untested.
   - numbered items, with history grouped into "1 - 10", "11 - 20"… submenus
   - the 5 most recent items shown directly in the menu (configurable)
   - snippets above or below history
+- Pinned items: click the pin icon on a history item, or press Ctrl+P while it
+  is highlighted, to keep it in a "Pinned" section above History. Pins are
+  never removed by Clear History, periodic clearing or the history size limit.
+  Click the pin again to unpin, or delete the item with the delete modifier.
 - Selecting an item copies it and pastes it into the focused window. Terminals
   get Ctrl+Shift+V and everything else gets Ctrl+V.
 - Optional modifiers that delete an item, or paste it and then delete it.

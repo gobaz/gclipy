@@ -14,6 +14,7 @@ const OPTIONS = {
     showClearHistoryItem: true,
 };
 
+const recent = items => ({pinned: [], recent: items});
 const history = count => Array.from({length: count}, (_, i) => ({id: `id${i}`, text: `item ${i}`}));
 
 const shape = nodes => nodes.map(node => {
@@ -37,7 +38,7 @@ test('titles: numbering and truncation', () => {
 });
 
 test('menu: all history in range submenus by default', () => {
-    assertEqual(shape(buildHistoryNodes(history(12), OPTIONS)), [
+    assertEqual(shape(buildHistoryNodes(recent(history(12)), OPTIONS)), [
         'History',
         {'1 - 10': ['1. item 0', '2. item 1', '3. item 2', '4. item 3', '5. item 4',
             '6. item 5', '7. item 6', '8. item 7', '9. item 8', '10. item 9']},
@@ -46,7 +47,7 @@ test('menu: all history in range submenus by default', () => {
 });
 
 test('menu: inline items then ranges, starting at zero', () => {
-    const nodes = buildHistoryNodes(history(5), {...OPTIONS, inlineLimit: 2, folderLimit: 2, startAtZero: true});
+    const nodes = buildHistoryNodes(recent(history(5)), {...OPTIONS, inlineLimit: 2, folderLimit: 2, startAtZero: true});
     assertEqual(shape(nodes), [
         'History',
         '0. item 0',
@@ -57,17 +58,17 @@ test('menu: inline items then ranges, starting at zero', () => {
 });
 
 test('menu: inline limit larger than history', () => {
-    assertEqual(shape(buildHistoryNodes(history(2), {...OPTIONS, inlineLimit: 5})), ['History', '1. item 0', '2. item 1']);
+    assertEqual(shape(buildHistoryNodes(recent(history(2)), {...OPTIONS, inlineLimit: 5})), ['History', '1. item 0', '2. item 1']);
 });
 
 test('menu: empty history has only the label', () => {
-    assertEqual(shape(buildHistoryNodes([], OPTIONS)), ['History']);
+    assertEqual(shape(buildHistoryNodes(recent([]), OPTIONS)), ['History']);
 });
 
 test('menu: tooltips follow settings', () => {
-    const [, node] = buildHistoryNodes([{id: 'a', text: 'abcdef'}], {...OPTIONS, inlineLimit: 1, maxTooltipLength: 3});
+    const [, node] = buildHistoryNodes(recent([{id: 'a', text: 'abcdef'}]), {...OPTIONS, inlineLimit: 1, maxTooltipLength: 3});
     assertEqual(node.tooltip, 'abc');
-    const [, hidden] = buildHistoryNodes([{id: 'a', text: 'abcdef'}], {...OPTIONS, inlineLimit: 1, showTooltips: false});
+    const [, hidden] = buildHistoryNodes(recent([{id: 'a', text: 'abcdef'}]), {...OPTIONS, inlineLimit: 1, showTooltips: false});
     assertEqual(hidden.tooltip, null);
 });
 
@@ -86,11 +87,28 @@ test('menu: snippets skip disabled folders and snippets', () => {
 });
 
 test('menu: main menu order', () => {
-    assertEqual(shape(buildMainMenu([], FOLDERS, OPTIONS)), [
+    assertEqual(shape(buildMainMenu(recent([]), FOLDERS, OPTIONS)), [
         'History', 'separator', 'Snippet', {Work: ['1. Hi', '2. Bye']},
         'separator', 'Clear History', 'Edit Snippets', 'Settings…',
     ]);
-    assertEqual(shape(buildMainMenu([], [], {...OPTIONS, snippetsAboveHistory: true, showClearHistoryItem: false})), [
+    assertEqual(shape(buildMainMenu(recent([]), [], {...OPTIONS, snippetsAboveHistory: true, showClearHistoryItem: false})), [
         'separator', 'History', 'separator', 'Edit Snippets', 'Settings…',
     ]);
+});
+
+test('menu: pinned section above history with its own numbering', () => {
+    const pinned = [{id: 'p0', text: 'pin zero', pinned: true}, {id: 'p1', text: 'pin one', pinned: true}];
+    const nodes = buildHistoryNodes({pinned, recent: history(3)}, {...OPTIONS, inlineLimit: 1, folderLimit: 5});
+    assertEqual(shape(nodes), [
+        'Pinned', '1. pin zero', '2. pin one',
+        'History', '1. item 0', {'2 - 3': ['1. item 1', '2. item 2']},
+    ]);
+    assertEqual(nodes.filter(node => node.type === 'history').map(node => node.pinned), [true, true, false]);
+});
+
+test('menu: pinned items stay inline even with inline limit 0', () => {
+    const pinned = Array.from({length: 12}, (_, i) => ({id: `p${i}`, text: `p${i}`, pinned: true}));
+    const nodes = buildHistoryNodes({pinned, recent: []}, OPTIONS);
+    assertEqual(nodes.filter(node => node.type === 'history').length, 12);
+    assertEqual(nodes.some(node => node.type === 'submenu'), false);
 });
