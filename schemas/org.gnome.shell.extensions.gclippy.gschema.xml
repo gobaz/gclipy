@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.gclippy" path="/org/gnome/shell/extensions/gclippy/">
+
+    <!-- History -->
+    <key name="max-history" type="i">
+      <range min="1" max="9999"/>
+      <default>30</default>
+      <summary>Maximum number of history items</summary>
+    </key>
+    <key name="reorder-after-paste" type="b">
+      <default>true</default>
+      <summary>Move items to the top when they are copied again</summary>
+      <description>When off, history is ordered by when an item was first copied.</description>
+    </key>
+    <key name="allow-duplicate" type="b">
+      <default>true</default>
+      <summary>Record content that is already in history</summary>
+    </key>
+    <key name="overwrite-duplicate" type="b">
+      <default>true</default>
+      <summary>Replace the existing entry instead of adding a second one</summary>
+    </key>
+    <key name="ignore-concealed" type="b">
+      <default>false</default>
+      <summary>Ignore content that password managers mark as secret</summary>
+      <description>Skips clipboard content offering the x-kde-passwordManagerHint type.</description>
+    </key>
+    <key name="excluded-apps" type="as">
+      <default>[]</default>
+      <summary>Applications whose copies are not recorded</summary>
+      <description>WM_CLASS names or application ids (e.g. "KeePassXC" or "org.keepassxc.KeePassXC").</description>
+    </key>
+    <key name="confirm-clear-history" type="b">
+      <default>true</default>
+      <summary>Ask before clearing history</summary>
+    </key>
+    <key name="clear-periodically" type="b">
+      <default>false</default>
+      <summary>Clear history periodically</summary>
+    </key>
+    <key name="clear-interval" type="i">
+      <default>3600</default>
+      <summary>Seconds between periodic history clears</summary>
+    </key>
+    <key name="clear-on-disable" type="b">
+      <default>false</default>
+      <summary>Clear history when the extension is disabled</summary>
+      <description>GNOME also disables extensions while the screen is locked, so this clears history on lock as well.</description>
+    </key>
+
+    <!-- Menu -->
+    <key name="show-indicator" type="b">
+      <default>true</default>
+      <summary>Show the icon in the top bar</summary>
+    </key>
+    <key name="show-icons" type="b">
+      <default>true</default>
+      <summary>Show icons next to folders and snippets</summary>
+    </key>
+    <key name="snippets-above-history" type="b">
+      <default>false</default>
+      <summary>Show snippets above history in the main menu</summary>
+    </key>
+    <key name="inline-limit" type="i">
+      <range min="0" max="999"/>
+      <default>5</default>
+      <summary>History items shown directly in the menu</summary>
+    </key>
+    <key name="folder-limit" type="i">
+      <range min="1" max="999"/>
+      <default>10</default>
+      <summary>History items per numbered submenu</summary>
+    </key>
+    <key name="max-title-length" type="i">
+      <range min="3" max="500"/>
+      <default>20</default>
+      <summary>Maximum menu item title length</summary>
+    </key>
+    <key name="mark-numbers" type="b">
+      <default>true</default>
+      <summary>Number menu items</summary>
+    </key>
+    <key name="start-at-zero" type="b">
+      <default>false</default>
+      <summary>Start numbering at 0</summary>
+    </key>
+    <key name="show-clear-history-item" type="b">
+      <default>true</default>
+      <summary>Show "Clear History" in the main menu</summary>
+    </key>
+    <key name="show-tooltips" type="b">
+      <default>true</default>
+      <summary>Show a preview of the highlighted item</summary>
+    </key>
+    <key name="max-tooltip-length" type="i">
+      <range min="1" max="10000"/>
+      <default>200</default>
+      <summary>Maximum preview length</summary>
+    </key>
+
+    <!-- Paste -->
+    <key name="paste-automatically" type="b">
+      <default>true</default>
+      <summary>Paste the selected item into the focused window</summary>
+    </key>
+    <key name="delete-modifier" type="s">
+      <choices>
+        <choice value="none"/><choice value="ctrl"/><choice value="shift"/><choice value="alt"/><choice value="super"/>
+      </choices>
+      <default>'none'</default>
+      <summary>Modifier that deletes the selected history item instead of pasting it</summary>
+    </key>
+    <key name="paste-delete-modifier" type="s">
+      <choices>
+        <choice value="none"/><choice value="ctrl"/><choice value="shift"/><choice value="alt"/><choice value="super"/>
+      </choices>
+      <default>'none'</default>
+      <summary>Modifier that pastes the selected history item and then deletes it</summary>
+    </key>
+    <key name="terminal-wm-classes" type="as">
+      <default>['gnome-terminal', 'org.gnome.Terminal', 'kgx', 'org.gnome.Console', 'ptyxis', 'org.gnome.Ptyxis', 'tilix', 'terminator', 'xterm', 'urxvt', 'alacritty', 'kitty', 'foot', 'wezterm', 'org.wezfurlong.wezterm', 'com.mitchellh.ghostty', 'konsole', 'xfce4-terminal']</default>
+      <summary>Windows that paste with Ctrl+Shift+V</summary>
+      <description>WM_CLASS names or application ids, matched like excluded-apps.</description>
+    </key>
+
+    <!-- Shortcuts -->
+    <key name="shortcut-main" type="as">
+      <default><![CDATA[['<Shift><Super>v']]]></default>
+      <summary>Open the main menu</summary>
+    </key>
+    <key name="shortcut-history" type="as">
+      <default><![CDATA[['<Control><Super>v']]]></default>
+      <summary>Open the history menu</summary>
+    </key>
+    <key name="shortcut-snippets" type="as">
+      <default><![CDATA[['<Shift><Super>b']]]></default>
+      <summary>Open the snippets menu</summary>
+    </key>
+    <key name="shortcut-settings" type="as">
+      <default><![CDATA[['<Control><Alt><Shift><Super>v']]]></default>
+      <summary>Open settings</summary>
+    </key>
+  </schema>
+</schemalist>

@@ -1,0 +1,8 @@
+{
+  "uuid": "gclippy@gclippy.local",
+  "name": "gclippy",
+  "description": "Clipboard history and snippets menu for GNOME, based on the macOS app Clipy.",
+  "shell-version": ["45", "46", "47", "48"],
+  "settings-schema": "org.gnome.shell.extensions.gclippy",
+  "version-name": "0.1.0"
+}

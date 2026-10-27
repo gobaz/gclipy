@@ -1,0 +1,6 @@
+{
+  "uuid": "gclippy-smoke@gclippy.local",
+  "name": "gclippy smoke test",
+  "description": "Drives gclippy inside a headless shell. Used only by tests/smoke.sh.",
+  "shell-version": ["45", "46", "47", "48"]
+}

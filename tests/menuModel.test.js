@@ -1,0 +1,96 @@
+import {buildHistoryNodes, buildMainMenu, buildSnippetNodes} from '../lib/menuModel.js';
+import {numberedTitle, trimmedMenuTitle, truncate} from '../lib/titles.js';
+import {assertEqual, test} from './harness.js';
+
+const OPTIONS = {
+    inlineLimit: 0,
+    folderLimit: 10,
+    maxTitleLength: 20,
+    maxTooltipLength: 200,
+    showTooltips: true,
+    markNumbers: true,
+    startAtZero: false,
+    snippetsAboveHistory: false,
+    showClearHistoryItem: true,
+};
+
+const history = count => Array.from({length: count}, (_, i) => ({id: `id${i}`, text: `item ${i}`}));
+
+const shape = nodes => nodes.map(node => {
+    if (node.type === 'submenu')
+        return {[node.title]: shape(node.children)};
+    return node.title ?? node.text ?? node.type;
+});
+
+test('titles: trims to first line and shortens', () => {
+    assertEqual(trimmedMenuTitle('  hello\nworld  ', 20), 'hello');
+    assertEqual(trimmedMenuTitle('abcdefghij', 5), 'ab...');
+    assertEqual(trimmedMenuTitle('abcde', 5), 'abcde');
+    assertEqual(trimmedMenuTitle('abcdef', 1), '...', 'limit never goes below the symbol length');
+    assertEqual(trimmedMenuTitle('😀😀😀😀😀😀', 5), '😀😀...', 'counts code points');
+});
+
+test('titles: numbering and truncation', () => {
+    assertEqual(numberedTitle('x', 3, true), '3. x');
+    assertEqual(numberedTitle('x', 3, false), 'x');
+    assertEqual(truncate('abcdef', 3), 'abc');
+});
+
+test('menu: all history in range submenus by default', () => {
+    assertEqual(shape(buildHistoryNodes(history(12), OPTIONS)), [
+        'History',
+        {'1 - 10': ['1. item 0', '2. item 1', '3. item 2', '4. item 3', '5. item 4',
+            '6. item 5', '7. item 6', '8. item 7', '9. item 8', '10. item 9']},
+        {'11 - 12': ['1. item 10', '2. item 11']},
+    ]);
+});
+
+test('menu: inline items then ranges, starting at zero', () => {
+    const nodes = buildHistoryNodes(history(5), {...OPTIONS, inlineLimit: 2, folderLimit: 2, startAtZero: true});
+    assertEqual(shape(nodes), [
+        'History',
+        '0. item 0',
+        '1. item 1',
+        {'2 - 3': ['0. item 2', '1. item 3']},
+        {'4 - 4': ['0. item 4']},
+    ]);
+});
+
+test('menu: inline limit larger than history', () => {
+    assertEqual(shape(buildHistoryNodes(history(2), {...OPTIONS, inlineLimit: 5})), ['History', '1. item 0', '2. item 1']);
+});
+
+test('menu: empty history has only the label', () => {
+    assertEqual(shape(buildHistoryNodes([], OPTIONS)), ['History']);
+});
+
+test('menu: tooltips follow settings', () => {
+    const [, node] = buildHistoryNodes([{id: 'a', text: 'abcdef'}], {...OPTIONS, inlineLimit: 1, maxTooltipLength: 3});
+    assertEqual(node.tooltip, 'abc');
+    const [, hidden] = buildHistoryNodes([{id: 'a', text: 'abcdef'}], {...OPTIONS, inlineLimit: 1, showTooltips: false});
+    assertEqual(hidden.tooltip, null);
+});
+
+const FOLDERS = [
+    {id: '0', title: 'Work', enabled: true, snippets: [
+        {id: '0/0', title: 'Hi', content: 'Hello', enabled: true},
+        {id: '0/1', title: 'Off', content: 'x', enabled: false},
+        {id: '0/2', title: 'Bye', content: 'Goodbye', enabled: true},
+    ]},
+    {id: '1', title: 'Hidden', enabled: false, snippets: []},
+];
+
+test('menu: snippets skip disabled folders and snippets', () => {
+    assertEqual(shape(buildSnippetNodes(FOLDERS, OPTIONS)), ['Snippet', {Work: ['1. Hi', '2. Bye']}]);
+    assertEqual(buildSnippetNodes([], OPTIONS), []);
+});
+
+test('menu: main menu order', () => {
+    assertEqual(shape(buildMainMenu([], FOLDERS, OPTIONS)), [
+        'History', 'separator', 'Snippet', {Work: ['1. Hi', '2. Bye']},
+        'separator', 'Clear History', 'Edit Snippets', 'Settings…',
+    ]);
+    assertEqual(shape(buildMainMenu([], [], {...OPTIONS, snippetsAboveHistory: true, showClearHistoryItem: false})), [
+        'separator', 'History', 'separator', 'Edit Snippets', 'Settings…',
+    ]);
+});
