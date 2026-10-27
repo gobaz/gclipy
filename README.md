@@ -1,6 +1,6 @@
 # gclipy
 
-Clipboard history and snippet menus for GNOME Shell, ported from the macOS app
+Clipboard history and snippet menus for GNOME Shell, inspired by the macOS app
 [Clipy](https://github.com/Clipy/Clipy). It runs as a GNOME Shell extension
 because only code inside the shell can watch the clipboard, register global
 shortcuts and paste into other windows on Wayland.

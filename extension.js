@@ -1,4 +1,4 @@
-// gclipy: Clipy's clipboard history and snippet menus for GNOME Shell.
+// gclipy: clipboard history and snippet menus for GNOME Shell, inspired by Clipy.
 
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
