@@ -191,3 +191,23 @@ test('pins: JSON round trip and old files', () => {
     const [old] = itemsFromJSON({items: [{id: 'x', hash: 'h', text: 't', createdAt: 1, updatedAt: 1}]});
     assertEqual([old.pinned, old.pinOrder], [false, 0]);
 });
+
+test('pins: move up and down', () => {
+    const {store} = makeStore();
+    for (const text of ['a', 'b', 'c', 'free'])
+        store.addText(text, DEFAULTS);
+    for (const text of ['a', 'b', 'c'])
+        store.setPinned(`h:${text}`, true);
+    const order = () => store.pinned().map(item => item.text).join('');
+    assertEqual(store.movePinned('h:a', 1), true);
+    assertEqual(order(), 'bac');
+    assertEqual(store.movePinned('h:c', -1), true);
+    assertEqual(order(), 'bca');
+    assertEqual(store.movePinned('h:b', -1), false, 'already first');
+    assertEqual(store.movePinned('h:a', 1), false, 'already last');
+    assertEqual(store.movePinned('h:free', -1), false, 'not pinned');
+    assertEqual(store.movePinned('missing', 1), false);
+    assertEqual(order(), 'bca');
+    const reloaded = new HistoryStore({items: itemsFromJSON(JSON.parse(JSON.stringify(store))), hash: t => t, newId: () => 'x'});
+    assertEqual(reloaded.pinned().map(item => item.text).join(''), 'bca', 'order is saved');
+});

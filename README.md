@@ -26,6 +26,8 @@ the same extension API, but those versions are untested.
   is highlighted, to keep it in a "Pinned" section above History. Pins are
   never removed by Clear History, periodic clearing or the history size limit.
   Click the pin again to unpin, or delete the item with the delete modifier.
+  Rearrange pinned items with Ctrl+Up / Ctrl+Down on the highlighted item, or
+  turn on ▲/▼ buttons under Settings → Menu → "Show ▲/▼ buttons on pinned items".
 - Number keys: while a menu is open, press 1–9 to paste item 1–9, or 0 for
   item 10, including items inside folders. The keypad works with NumLock on. On
   layouts whose number row types letters (Lithuanian, French…) the keys still

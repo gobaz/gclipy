@@ -11,6 +11,7 @@ import {fitWithin} from '../lib/images.js';
  * @typedef {object} MenuHandlers
  * @property {(id: string, event: Clutter.Event) => void} onHistory
  * @property {(id: string, pinned: boolean) => void} onPin
+ * @property {(id: string, offset: number) => void} onMovePinned
  * @property {(id: string) => void} onSnippet
  * @property {(action: string) => void} onAction
  */
@@ -23,16 +24,17 @@ import {fitWithin} from '../lib/images.js';
  * @param {MenuHandlers} handlers
  * @param {object} options
  * @param {boolean} options.showIcons
+ * @param {boolean} options.showMoveButtons ▲/▼ buttons on pinned items
  * @param {{width: number, height: number, uri: (hash: string) => string} | null} options.thumbnails
  *   null hides image thumbnails
  * @param {import('./previewPanel.js').PreviewPanel} options.preview shows the highlighted item's text
  * @returns {Map<string, {item: PopupMenu.PopupMenuItem, folder: PopupMenu.PopupSubMenuMenuItem | null}>}
  *   history items by id, with the folder holding each one
  */
-export function renderMenu(menu, nodes, handlers, {showIcons, thumbnails, preview}) {
+export function renderMenu(menu, nodes, handlers, {showIcons, showMoveButtons, thumbnails, preview}) {
     menu.removeAll();
     const historyItems = new Map();
-    addNodes(menu, nodes, handlers, {showIcons, thumbnails, preview, topMenu: menu, historyItems, folder: null});
+    addNodes(menu, nodes, handlers, {showIcons, showMoveButtons, thumbnails, preview, topMenu: menu, historyItems, folder: null});
     // A menu holding only labels counts as empty and refuses to open, so say so explicitly.
     if (menu.isEmpty())
         menu.addMenuItem(new PopupMenu.PopupMenuItem('No items', {reactive: false, can_focus: false}));
@@ -62,7 +64,7 @@ function addNodes(menu, nodes, handlers, context) {
             item.label.x_expand = true;
             if (node.image && context.thumbnails)
                 item.add_child(thumbnail(context.thumbnails, node.image));
-            addPinButton(item, node, handlers.onPin);
+            addPinControls(item, node, handlers, context.showMoveButtons);
             item.connect('activate', (_item, event) => handlers.onHistory(node.id, event));
             context.preview.track(item, node.tooltip, context.topMenu);
             context.historyItems.set(node.id, {item, folder: context.folder});
@@ -92,14 +94,17 @@ function addNodes(menu, nodes, handlers, context) {
  * A pin toggle at the end of a history item, also reachable with Ctrl+P on the focused item.
  * The icon flips at once; the owner then rebuilds the menu to move the item.
  */
-function addPinButton(item, node, onPin) {
-    const icon = new St.Icon({icon_name: 'view-pin-symbolic', style_class: 'popup-menu-icon'});
-    // Not focusable, so arrow keys keep moving between items rather than stopping on buttons.
-    const button = new St.Button({child: icon, can_focus: false, style: 'padding: 0 0 0 8px;', y_align: Clutter.ActorAlign.CENTER});
+function addPinControls(item, node, {onPin, onMovePinned}, showMoveButtons) {
+    if (node.pinned && showMoveButtons) {
+        item.add_child(iconButton('go-up-symbolic', 'Move up', node.canMoveUp, () => onMovePinned(node.id, -1)));
+        item.add_child(iconButton('go-down-symbolic', 'Move down', node.canMoveDown, () => onMovePinned(node.id, 1)));
+    }
+
+    const pinButton = iconButton('view-pin-symbolic', '', true, () => toggle());
     let pinned = node.pinned;
     const update = () => {
-        icon.opacity = pinned ? 255 : 80;
-        button.accessible_name = pinned ? 'Unpin' : 'Pin';
+        pinButton.child.opacity = pinned ? 255 : 80;
+        pinButton.accessible_name = pinned ? 'Unpin' : 'Pin';
     };
     const toggle = () => {
         pinned = !pinned;
@@ -107,16 +112,40 @@ function addPinButton(item, node, onPin) {
         onPin(node.id, pinned);
     };
     update();
-    button.connect('clicked', toggle);
+    item.add_child(pinButton);
+
+    // Ctrl+P pins or unpins; Ctrl+Up/Down rearrange pinned items. Stopping the event also keeps
+    // the item's own arrow-key navigation from running.
     item.connect('key-press-event', (_item, event) => {
-        const control = (event.get_state() & Clutter.ModifierType.CONTROL_MASK) !== 0;
-        const key = event.get_key_symbol();
-        if (!control || (key !== Clutter.KEY_p && key !== Clutter.KEY_P))
+        if ((event.get_state() & Clutter.ModifierType.CONTROL_MASK) === 0)
             return Clutter.EVENT_PROPAGATE;
-        toggle();
+        const key = event.get_key_symbol();
+        if (key === Clutter.KEY_p || key === Clutter.KEY_P)
+            toggle();
+        else if (node.pinned && (key === Clutter.KEY_Up || key === Clutter.KEY_Down))
+            onMovePinned(node.id, key === Clutter.KEY_Up ? -1 : 1);
+        else
+            return Clutter.EVENT_PROPAGATE;
         return Clutter.EVENT_STOP;
     });
-    item.add_child(button);
+}
+
+/**
+ * A small icon button inside a menu item. Not focusable, so arrow keys keep moving between items.
+ * A disabled button stays in place but invisible, so icons line up across items.
+ */
+function iconButton(iconName, accessibleName, enabled, onClick) {
+    const button = new St.Button({
+        child: new St.Icon({icon_name: iconName, style_class: 'popup-menu-icon'}),
+        accessible_name: accessibleName,
+        can_focus: false,
+        reactive: enabled,
+        opacity: enabled ? 255 : 0,
+        style: 'padding: 0 0 0 8px;',
+        y_align: Clutter.ActorAlign.CENTER,
+    });
+    button.connect('clicked', onClick);
+    return button;
 }
 
 function thumbnail({width: maxWidth, height: maxHeight, uri}, image) {

@@ -32,7 +32,7 @@ const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
 const MENU_KEYS = new Set([
     'reorder-after-paste', 'show-icons', 'snippets-above-history', 'inline-limit', 'folder-limit', 'max-title-length',
     'mark-numbers', 'start-at-zero', 'show-clear-history-item', 'show-tooltips', 'max-preview-lines',
-    'show-images', 'thumbnail-width', 'thumbnail-height',
+    'show-images', 'thumbnail-width', 'thumbnail-height', 'show-move-buttons',
 ]);
 
 export default class GclippyExtension extends Extension {
@@ -380,13 +380,20 @@ export default class GclippyExtension extends Extension {
             onPin: (id, pinned) => {
                 if (this._history.setPinned(id, pinned)) {
                     this._historyChanged();
-                    this._moveAfterPin(menu, kind, id);
+                    this._rebuildKeepingFocus(menu, kind, id);
+                }
+            },
+            onMovePinned: (id, offset) => {
+                if (this._history.movePinned(id, offset)) {
+                    this._historyChanged();
+                    this._rebuildKeepingFocus(menu, kind, id);
                 }
             },
             onSnippet: id => this._onSnippetSelected(id),
             onAction: action => this._onAction(action),
         }, {
             showIcons: this._settings.get_boolean('show-icons'),
+            showMoveButtons: this._settings.get_boolean('show-move-buttons'),
             preview: this._preview,
             thumbnails: this._settings.get_boolean('show-images') ? {
                 width: this._settings.get_int('thumbnail-width'),
@@ -397,10 +404,10 @@ export default class GclippyExtension extends Extension {
     }
 
     /**
-     * Rebuild the open menu so a pinned or unpinned item moves at once, and keep the focus on it.
+     * Rebuild the open menu so a pinned, unpinned or rearranged item moves at once, and keep the focus on it.
      * Deferred because the click or key handler that triggered it belongs to an item being replaced.
      */
-    _moveAfterPin(menu, kind, id) {
+    _rebuildKeepingFocus(menu, kind, id) {
         if (this._pinRerenderId)
             GLib.source_remove(this._pinRerenderId);
         this._pinRerenderId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {

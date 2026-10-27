@@ -139,3 +139,11 @@ test('number keys: digits, keypad and number-row position', () => {
     assertEqual(numberForDigit(0, true), 0);
     assertEqual(numberForDigit(3, false), 3);
 });
+
+test('menu: pinned items know whether they can move', () => {
+    const pinned = ['a', 'b', 'c'].map(id => ({id, text: id, pinned: true}));
+    const nodes = buildHistoryNodes({pinned, recent: history(1)}, {...OPTIONS, inlineLimit: 5})
+        .filter(node => node.type === 'history');
+    assertEqual(nodes.map(node => [node.id, node.canMoveUp, node.canMoveDown]),
+        [['a', false, true], ['b', true, true], ['c', true, false], ['id0', false, false]]);
+});

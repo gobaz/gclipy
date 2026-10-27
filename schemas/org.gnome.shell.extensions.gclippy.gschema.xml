@@ -94,6 +94,11 @@
       <default>true</default>
       <summary>Show "Clear History" in the main menu</summary>
     </key>
+    <key name="show-move-buttons" type="b">
+      <default>false</default>
+      <summary>Show up/down buttons on pinned items</summary>
+      <description>Pinned items can always be rearranged with Ctrl+Up and Ctrl+Down.</description>
+    </key>
     <key name="show-images" type="b">
       <default>true</default>
       <summary>Show image thumbnails in the menu</summary>

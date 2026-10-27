@@ -192,6 +192,7 @@ export default class SmokeExtension extends Extension {
         gclippy = await this._testPins(gclippy, settings);
         await this._testNumberKeys(gclippy, settings);
         await this._testPreview(gclippy);
+        gclippy = await this._testReorder(gclippy, settings);
 
         gclippy.openPreferences();
         await wait(3000);
@@ -320,6 +321,91 @@ export default class SmokeExtension extends Extension {
 
         pointer.run_dispose();
         keyboard.run_dispose();
+        return gclippy;
+    }
+
+    async _testReorder(gclippy, settings) {
+        const clipboard = St.Clipboard.get_default();
+        const seat = Clutter.get_default_backend().get_default_seat();
+        const keyboard = seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        const pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        const time = () => GLib.get_monotonic_time();
+        const menu = () => gclippy._pointerMenu.menu;
+        const itemFor = text => menu()._getMenuItems().find(item => item.label?.text.endsWith(` ${text}`));
+        const order = () => gclippy._history.pinned().map(item => item.text).join(',');
+        const focusedLabel = () => global.stage.get_key_focus()?.label?.text;
+        const ctrl = async key => {
+            keyboard.notify_keyval(time(), Clutter.KEY_Control_L, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time(), key, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time(), key, Clutter.KeyState.RELEASED);
+            keyboard.notify_keyval(time(), Clutter.KEY_Control_L, Clutter.KeyState.RELEASED);
+            await wait(300);
+        };
+        // Children of a pinned item: ornament, label, up, down, pin.
+        const moveButtons = item => {
+            const children = item.get_children();
+            return {up: children[children.length - 3], down: children[children.length - 2]};
+        };
+
+        for (const item of gclippy._history.pinned())
+            gclippy._history.setPinned(item.id, false);
+        settings.set_boolean('confirm-clear-history', false);
+        gclippy._clearHistory();
+        settings.reset('confirm-clear-history');
+        for (const text of ['ra', 'rb', 'rc']) {
+            clipboard.set_text(St.ClipboardType.CLIPBOARD, text);
+            await wait(300);
+            gclippy._history.setPinned(gclippy._history.sorted(false)[0].id, true);
+        }
+        gclippy._historyChanged();
+
+        gclippy._popUp('history');
+        await wait(300);
+        itemFor('ra').grab_key_focus();
+        await ctrl(Clutter.KEY_Down);
+        check('Ctrl+Down moves a pinned item down', order() === 'rb,ra,rc', order());
+        check('Ctrl+Down keeps the menu open and focus on the item', menu().isOpen && focusedLabel() === '2. ra', focusedLabel());
+        check('moving does not paste', await clipboardText() === 'rc');
+        await ctrl(Clutter.KEY_Up);
+        check('Ctrl+Up moves it back', order() === 'ra,rb,rc' && focusedLabel() === '1. ra', `${order()} focus=${focusedLabel()}`);
+        const hasMoveButton = item => item.get_children().some(child => child.accessible_name === 'Move up');
+        check('move buttons are hidden by default', !hasMoveButton(itemFor('ra')) && !hasMoveButton(itemFor('rb')));
+
+        settings.set_boolean('show-move-buttons', true);
+        menu().close();
+        gclippy._popUp('history');
+        await wait(300);
+        check('show-move-buttons=true adds them', hasMoveButton(itemFor('rb')));
+
+        check('first pin cannot move up, last cannot move down',
+            !moveButtons(itemFor('ra')).up.reactive && moveButtons(itemFor('ra')).down.reactive &&
+            moveButtons(itemFor('rc')).up.reactive && !moveButtons(itemFor('rc')).down.reactive);
+
+        const up = moveButtons(itemFor('rc')).up;
+        const [x, y] = up.get_transformed_position();
+        const [width, height] = up.get_transformed_size();
+        pointer.notify_absolute_motion(time(), x + width / 2, y + height / 2);
+        await wait(100);
+        pointer.notify_button(time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+        pointer.notify_button(time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+        await wait(300);
+        check('clicking ▲ moves the item up', order() === 'ra,rc,rb' && menu().isOpen, order());
+        const reordered = labels(menu()).slice(0, 4);
+        check('numbers follow the new order', JSON.stringify(reordered) === JSON.stringify(['Pinned', '1. ra', '2. rc', '3. rb']),
+            JSON.stringify(reordered));
+        menu().close();
+        settings.reset('show-move-buttons');
+
+        const ext = Main.extensionManager.lookup(UUID);
+        Main.extensionManager.disableExtension(UUID);
+        await waitFor(() => ext.state === ExtensionState.INACTIVE);
+        Main.extensionManager.enableExtension(UUID);
+        await waitFor(() => ext.state === ExtensionState.ACTIVE);
+        gclippy = ext.stateObj;
+        check('rearranged order persists', gclippy._history.pinned().map(item => item.text).join(',') === 'ra,rc,rb');
+
+        keyboard.run_dispose();
+        pointer.run_dispose();
         return gclippy;
     }
 

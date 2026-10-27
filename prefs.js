@@ -91,6 +91,8 @@ function menuPage(settings) {
     items.add(switchRow(settings, 'mark-numbers', 'Number items'));
     items.add(switchRow(settings, 'start-at-zero', 'Start numbering at 0'));
     items.add(switchRow(settings, 'show-icons', 'Show icons'));
+    items.add(switchRow(settings, 'show-move-buttons', 'Show ▲/▼ buttons on pinned items',
+        'Pinned items can always be rearranged with Ctrl+Up and Ctrl+Down'));
     items.add(switchRow(settings, 'show-images', 'Show image thumbnails'));
     const thumbnailWidth = spinRow(settings, 'thumbnail-width', 'Thumbnail width', 16, 512);
     const thumbnailHeight = spinRow(settings, 'thumbnail-height', 'Thumbnail height', 16, 512);
