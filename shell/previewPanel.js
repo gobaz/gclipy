@@ -1,14 +1,20 @@
-// Shows the highlighted item's text in a panel beside the menu. Keeping it outside the menu
+// Shows the highlighted item's text or image in a panel beside the menu. Keeping it outside the menu
 // means showing and hiding it never resizes the menu, which used to make the menu jump.
 
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
+import Clutter from 'gi://Clutter';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import {fitWithin} from '../lib/images.js';
+
 const GAP = 6;
+// Images are shown no larger than this; the thumbnail files are 512 px at most.
+const IMAGE_MAX_WIDTH = 320;
+const IMAGE_MAX_HEIGHT = 240;
 
 export class PreviewPanel {
     constructor() {
@@ -16,6 +22,7 @@ export class PreviewPanel {
         this._label.clutter_text.line_wrap = true;
         this._label.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
         this._label.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+        this._image = new St.Widget({x_align: Clutter.ActorAlign.CENTER});
         // Reuses the menu's own background, border and corner radius so the panel matches the theme.
         this.actor = new St.Bin({
             style_class: 'popup-menu-content',
@@ -30,18 +37,18 @@ export class PreviewPanel {
     }
 
     /**
-     * Follow an item: show its text while it is highlighted.
+     * Follow an item: show its text or image while it is highlighted.
      *
      * @param {import('resource:///org/gnome/shell/ui/popupMenu.js').PopupBaseMenuItem} item
-     * @param {string | null} text
+     * @param {{text: string | null, image: {uri: string, width: number, height: number} | null}} content
      * @param {import('resource:///org/gnome/shell/ui/popupMenu.js').PopupMenu} menu top-level menu the item is in
      */
-    track(item, text, menu) {
-        if (!text)
+    track(item, content, menu) {
+        if (!content.text && !content.image)
             return;
         item.connect('notify::active', () => {
             if (item.active)
-                this._show(item, text, menu);
+                this._show(item, content, menu);
             else if (this._item === item)
                 this.hide();
         });
@@ -57,11 +64,16 @@ export class PreviewPanel {
         this.actor.hide();
     }
 
-    _show(item, text, menu) {
+    _show(item, content, menu) {
         this._stopWaitingForLayout();
         this._item = item;
-        // Already limited to the configured number of lines by lib/menuModel.js.
-        this._label.text = text;
+        if (content.image) {
+            this._showImage(content.image);
+        } else {
+            // Already limited to the configured number of lines by lib/menuModel.js.
+            this._label.text = content.text;
+            this.actor.child = this._label;
+        }
         if (this._place(item, menu)) {
             this._reveal();
             return;
@@ -79,6 +91,15 @@ export class PreviewPanel {
             this._reveal();
             return GLib.SOURCE_REMOVE;
         });
+    }
+
+    _showImage({uri, width, height}) {
+        // Like the menu thumbnails: St cannot centre a background, so the widget takes the
+        // image's aspect ratio and the thumbnail file is scaled to fill it.
+        const [w, h] = fitWithin(width, height, IMAGE_MAX_WIDTH, IMAGE_MAX_HEIGHT);
+        this._image.style = `background-image: url("${uri}"); background-size: ${w}px ${h}px; ` +
+            `width: ${w}px; height: ${h}px;`;
+        this.actor.child = this._image;
     }
 
     _stopWaitingForLayout() {
@@ -119,6 +140,9 @@ export class PreviewPanel {
 
     destroy() {
         this._stopWaitingForLayout();
+        // Only one of the two is the child at a time; destroy the other one too.
+        this._label.destroy();
+        this._image.destroy();
         this.actor.destroy();
     }
 }

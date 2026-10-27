@@ -68,9 +68,14 @@ function saveScreenshot(path) {
 
 const hasThumbnail = item => item.get_children().some(child => child.style?.includes('background-image'));
 
+// Image items show "[icon] 2. 64×64"; their accessible name spells it out as "Image 2. 64×64".
+const itemTitle = item => item.accessible_name || item.label.text;
+const isImageItem = item => item.accessible_name?.startsWith('Image ');
+const hasIcon = (item, name) => item.get_children().some(child => child.icon_name === name);
+
 const labels = menu => menu._getMenuItems()
     .filter(item => item.label && item.visible)
-    .map(item => item.label.text);
+    .map(itemTitle);
 
 export default class SmokeExtension extends Extension {
     enable() {
@@ -680,9 +685,24 @@ export default class SmokeExtension extends Extension {
         itemFor('short').grab_key_focus();
         await wait(100);
         check('preview follows the highlight', preview.visible && preview.child.text === 'short');
-        itemFor('(Image) 64×64').grab_key_focus();
+        const imageItem = itemFor('64×64');
+        imageItem.grab_key_focus();
         await wait(100);
-        check('items without text hide the preview', !preview.visible);
+        const imageHash = gclipy._history.sorted(false).find(item => item.width === 64).hash;
+        check('an image item previews its picture', preview.visible &&
+            preview.child.style?.includes(gclipy._images.thumbnailFile(imageHash).get_uri()) &&
+            preview.child.width === 64 && preview.child.height === 64, preview.child.style);
+        gclipy._settings.set_boolean('show-tooltips', false);
+        gclipy._popUp('history');
+        await wait(300);
+        itemFor('64×64').grab_key_focus();
+        await wait(100);
+        check('show-tooltips=false hides image previews', !preview.visible);
+        gclipy._settings.reset('show-tooltips');
+        gclipy._popUp('history');
+        await wait(300);
+        itemFor('short').grab_key_focus();
+        await wait(100);
         check('menu size never changes', JSON.stringify(menu.actor.get_transformed_size()) ===
             JSON.stringify([menuWidth, menuHeight]), `${menuHeight} -> ${menu.actor.get_transformed_size()[1]}`);
         menu.close();
@@ -726,7 +746,7 @@ export default class SmokeExtension extends Extension {
 
         gclipy._popUp('history');
         check('numbers continue from pinned items', JSON.stringify(labels(menu).slice(0, 6)) ===
-            JSON.stringify(['Pinned', '1. pin me', '2. (Image) 64×64', 'History', '3. n2', '4. n1']), JSON.stringify(labels(menu)));
+            JSON.stringify(['Pinned', '1. pin me', 'Image 2. 64×64', 'History', '3. n2', '4. n1']), JSON.stringify(labels(menu)));
         tapKeyval(Clutter.KEY_3);
         await wait(400);
         check('pressing 3 pastes item 3 and closes the menu', !menu.isOpen && await clipboardText() === 'n2');
@@ -813,10 +833,16 @@ export default class SmokeExtension extends Extension {
         gclipy._popUp('history');
         await wait(300);
         const menuItems = gclipy._pointerMenu.menu._getMenuItems();
-        const imageItems = menuItems.filter(item => item.label?.text.includes('(Image)'));
-        check('menu lists images with titles', JSON.stringify(imageItems.map(item => item.label.text)) ===
-            JSON.stringify(['2. (Image) 300×150', '3. (Image) 400×100']),
-        JSON.stringify(menuItems.map(item => item.label?.text)));
+        const imageItems = menuItems.filter(isImageItem);
+        check('menu lists images with titles', JSON.stringify(imageItems.map(itemTitle)) ===
+            JSON.stringify(['Image 2. 300×150', 'Image 3. 400×100']),
+        JSON.stringify(menuItems.map(item => item.label && itemTitle(item))));
+        check('image items show an icon instead of "(Image)"',
+            imageItems.every(item => hasIcon(item, 'image-x-generic-symbolic')) &&
+            imageItems[0].label.text === '2. 300×150');
+        const textItem = menuItems.find(item => item.label?.text.startsWith('1. smoke text'));
+        check('text items show a text icon', !!textItem && hasIcon(textItem, 'text-x-generic-symbolic') &&
+            !hasIcon(textItem, 'image-x-generic-symbolic'));
         check('image items have thumbnails', imageItems.length === 2 && imageItems.every(hasThumbnail));
         // SMOKE_MENU_SCREENSHOT=path saves the open menu with thumbnails for a visual check.
         const menuScreenshot = GLib.getenv('SMOKE_MENU_SCREENSHOT');
@@ -835,10 +861,20 @@ export default class SmokeExtension extends Extension {
 
         settings.set_boolean('show-images', false);
         gclipy._popUp('history');
-        const plainItems = gclipy._pointerMenu.menu._getMenuItems().filter(item => item.label?.text.includes('(Image)'));
+        const plainItems = gclipy._pointerMenu.menu._getMenuItems().filter(isImageItem);
         check('show-images=false hides thumbnails', plainItems.length === 2 && !plainItems.some(hasThumbnail));
         gclipy._pointerMenu.menu.close();
         settings.reset('show-images');
+
+        settings.set_boolean('show-icons', false);
+        gclipy._popUp('history');
+        const iconless = gclipy._pointerMenu.menu._getMenuItems();
+        check('show-icons=false drops the icons and titles images "(Image)"',
+            iconless.some(item => item.label?.text.endsWith('. (Image) 400×100')) &&
+            !iconless.some(item => hasIcon(item, 'text-x-generic-symbolic') || hasIcon(item, 'image-x-generic-symbolic')),
+        JSON.stringify(iconless.map(item => item.label?.text)));
+        gclipy._pointerMenu.menu.close();
+        settings.reset('show-icons');
 
         settings.set_boolean('record-images', false);
         clipboard.set_content(St.ClipboardType.CLIPBOARD, 'image/png', makeImage(50, 50, 'png'));

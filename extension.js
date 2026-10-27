@@ -389,6 +389,7 @@ export default class GclipyExtension extends Extension {
             startAtZero: s.get_boolean('start-at-zero'),
             snippetsAboveHistory: s.get_boolean('snippets-above-history'),
             showClearHistoryItem: s.get_boolean('show-clear-history-item'),
+            showIcons: s.get_boolean('show-icons'),
         };
     }
 
@@ -432,6 +433,9 @@ export default class GclipyExtension extends Extension {
             showIcons: this._settings.get_boolean('show-icons'),
             showMoveButtons: this._settings.get_boolean('show-move-buttons'),
             preview: this._preview,
+            imagePreview: this._settings.get_boolean('show-tooltips')
+                ? hash => this._images.thumbnailFile(hash).get_uri()
+                : null,
             thumbnails: this._settings.get_boolean('show-images') ? {
                 width: this._settings.get_int('thumbnail-width'),
                 height: this._settings.get_int('thumbnail-height'),

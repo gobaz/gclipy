@@ -141,10 +141,12 @@ test('history: JSON without kind loads as text, broken images dropped', () => {
 
 test('menu: image items', () => {
     const options = {inlineLimit: 5, folderLimit: 10, maxTitleLength: 5, maxPreviewLines: 8,
-        showTooltips: true, markNumbers: true, startAtZero: false};
+        showTooltips: true, markNumbers: true, startAtZero: false, showIcons: true};
     const image = {id: 'i', kind: 'image', hash: 'abc', text: '', width: 1920, height: 1080, pinned: false};
     const [, node] = buildHistoryNodes({pinned: [], recent: [image]}, options);
-    assertEqual(node, {type: 'history', id: 'i', number: 1, title: '1. (Image) 1920×1080', tooltip: null, pinned: false,
+    assertEqual(node, {type: 'history', id: 'i', number: 1, title: '1. 1920×1080', tooltip: null, pinned: false,
         canMoveUp: false, canMoveDown: false,
         image: {hash: 'abc', width: 1920, height: 1080}});
+    const [, withoutIcons] = buildHistoryNodes({pinned: [], recent: [image]}, {...options, showIcons: false});
+    assertEqual(withoutIcons.title, '1. (Image) 1920×1080');
 });

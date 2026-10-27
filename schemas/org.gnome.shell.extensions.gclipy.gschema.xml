@@ -61,7 +61,7 @@
     </key>
     <key name="show-icons" type="b">
       <default>true</default>
-      <summary>Show icons next to folders and snippets</summary>
+      <summary>Show icons next to folders, snippets and history items</summary>
     </key>
     <key name="snippets-above-history" type="b">
       <default>true</default>

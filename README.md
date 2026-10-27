@@ -14,8 +14,11 @@ the same extension API, but those versions are untested.
 
 - Clipboard history of text and images, newest first, with Clipy's duplicate
   handling (record or ignore duplicates, move a re-copied item to the top).
-- Images (screenshots, "Copy Image" in browsers, image editors) are listed as
-  "(Image) W×H" with a thumbnail and are pasted back as PNG. When a copy offers
+- History items start with a text or image icon (Settings → Menu → "Show
+  icons"; without icons, images are titled "(Image)").
+- Images (screenshots, "Copy Image" in browsers, image editors) are listed with
+  their size (W×H) and a thumbnail, previewed larger (up to 320×240) in
+  the side panel when highlighted, and are pasted back as PNG. When a copy offers
   both text and an image, as spreadsheets and office apps do, the text is
   recorded.
 - Snippet folders, read from `~/.local/share/gclipy/snippets.json`.

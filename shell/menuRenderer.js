@@ -29,15 +29,17 @@ import {SideSubmenuItem} from './sideSubmenu.js';
  * @param {boolean} options.showMoveButtons ▲/▼ buttons on pinned items
  * @param {{width: number, height: number, uri: (hash: string) => string} | null} options.thumbnails
  *   null hides image thumbnails
- * @param {import('./previewPanel.js').PreviewPanel} options.preview shows the highlighted item's text
+ * @param {import('./previewPanel.js').PreviewPanel} options.preview shows the highlighted item's text or image
+ * @param {((hash: string) => string) | null} options.imagePreview URI of an image to preview by its hash;
+ *   null shows no image previews
  * @returns {Map<string, {item: PopupMenu.PopupMenuItem, folder: SideSubmenuItem | null}>}
  *   history items by id, with the folder holding each one
  */
-export function renderMenu(menu, nodes, handlers, {showIcons, showMoveButtons, thumbnails, preview}) {
+export function renderMenu(menu, nodes, handlers, {showIcons, showMoveButtons, thumbnails, preview, imagePreview}) {
     menu.removeAll();
     const historyItems = new Map();
     addNodes(menu, nodes, handlers, {
-        showIcons, showMoveButtons, thumbnails, preview, historyItems,
+        showIcons, showMoveButtons, thumbnails, preview, imagePreview, historyItems,
         folder: null,
         // The preview panel is placed beside whichever menu or side panel holds the item.
         previewMenu: menu,
@@ -69,11 +71,16 @@ function addNodes(menu, nodes, handlers, context) {
             const item = new PopupMenu.PopupMenuItem(node.title);
             // Push the thumbnail and pin button to the right edge.
             item.label.x_expand = true;
+            if (context.showIcons)
+                addKindIcon(item, node);
             if (node.image && context.thumbnails)
                 item.add_child(thumbnail(context.thumbnails, node.image));
             addItemControls(item, node, handlers, context.showMoveButtons);
             item.connect('activate', (_item, event) => handlers.onHistory(node.id, event));
-            context.preview.track(item, node.tooltip, context.previewMenu);
+            const image = node.image && context.imagePreview
+                ? {uri: context.imagePreview(node.image.hash), width: node.image.width, height: node.image.height}
+                : null;
+            context.preview.track(item, {text: node.tooltip, image}, context.previewMenu);
             context.historyItems.set(node.id, {item, folder: context.folder});
             menu.addMenuItem(item);
             break;
@@ -83,7 +90,7 @@ function addNodes(menu, nodes, handlers, context) {
                 ? new PopupMenu.PopupImageMenuItem(node.title, 'text-x-generic-symbolic')
                 : new PopupMenu.PopupMenuItem(node.title);
             item.connect('activate', () => handlers.onSnippet(node.id));
-            context.preview.track(item, node.tooltip, context.previewMenu);
+            context.preview.track(item, {text: node.tooltip, image: null}, context.previewMenu);
             menu.addMenuItem(item);
             break;
         }
@@ -95,6 +102,20 @@ function addNodes(menu, nodes, handlers, context) {
         }
         }
     }
+}
+
+/**
+ * A text or image icon before the title, like the icons on folders and snippets. For images it
+ * stands in for Clipy's "(Image)", which lib/menuModel.js then leaves out of the title.
+ */
+function addKindIcon(item, node) {
+    const icon = new St.Icon({
+        icon_name: node.image ? 'image-x-generic-symbolic' : 'text-x-generic-symbolic',
+        style_class: 'popup-menu-icon',
+    });
+    item.insert_child_below(icon, item.label);
+    if (node.image)
+        item.accessible_name = `Image ${node.title}`;
 }
 
 /**
