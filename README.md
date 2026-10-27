@@ -39,7 +39,9 @@ the same extension API, but those versions are untested.
   work by position. You can turn this off under Settings → General → Paste.
 - Selecting an item copies it and pastes it into the focused window. Terminals
   get Ctrl+Shift+V and everything else gets Ctrl+V.
-- Optional modifiers that delete an item, or paste it and then delete it.
+- Press Delete on a highlighted history item (pinned or not) to remove it; the
+  menu stays open. Optional modifiers can also delete an item on selection, or
+  paste it and then delete it.
 - Excluded applications, and skipping of content that password managers mark
   as secret (`x-kde-passwordManagerHint`).
 - Clearing history manually (with confirmation), periodically, or when the

@@ -13,6 +13,7 @@ import {SideSubmenuItem} from './sideSubmenu.js';
  * @property {(id: string, event: Clutter.Event) => void} onHistory
  * @property {(id: string, pinned: boolean) => void} onPin
  * @property {(id: string, offset: number) => void} onMovePinned
+ * @property {(id: string) => void} onDelete
  * @property {(id: string) => void} onSnippet
  * @property {(action: string) => void} onAction
  */
@@ -70,7 +71,7 @@ function addNodes(menu, nodes, handlers, context) {
             item.label.x_expand = true;
             if (node.image && context.thumbnails)
                 item.add_child(thumbnail(context.thumbnails, node.image));
-            addPinControls(item, node, handlers, context.showMoveButtons);
+            addItemControls(item, node, handlers, context.showMoveButtons);
             item.connect('activate', (_item, event) => handlers.onHistory(node.id, event));
             context.preview.track(item, node.tooltip, context.previewMenu);
             context.historyItems.set(node.id, {item, folder: context.folder});
@@ -100,7 +101,7 @@ function addNodes(menu, nodes, handlers, context) {
  * A pin toggle at the end of a history item, also reachable with Ctrl+P on the focused item.
  * The icon flips at once; the owner then rebuilds the menu to move the item.
  */
-function addPinControls(item, node, {onPin, onMovePinned}, showMoveButtons) {
+function addItemControls(item, node, {onPin, onMovePinned, onDelete}, showMoveButtons) {
     if (node.pinned && showMoveButtons) {
         item.add_child(iconButton('go-up-symbolic', 'Move up', node.canMoveUp, () => onMovePinned(node.id, -1)));
         item.add_child(iconButton('go-down-symbolic', 'Move down', node.canMoveDown, () => onMovePinned(node.id, 1)));
@@ -120,12 +121,16 @@ function addPinControls(item, node, {onPin, onMovePinned}, showMoveButtons) {
     update();
     item.add_child(pinButton);
 
-    // Ctrl+P pins or unpins; Ctrl+Up/Down rearrange pinned items. Stopping the event also keeps
-    // the item's own arrow-key navigation from running.
+    // Delete removes the item; Ctrl+P pins or unpins; Ctrl+Up/Down rearrange pinned items.
+    // Stopping the event also keeps the item's own arrow-key navigation from running.
     item.connect('key-press-event', (_item, event) => {
+        const key = event.get_key_symbol();
+        if (key === Clutter.KEY_Delete || key === Clutter.KEY_KP_Delete) {
+            onDelete(node.id);
+            return Clutter.EVENT_STOP;
+        }
         if ((event.get_state() & Clutter.ModifierType.CONTROL_MASK) === 0)
             return Clutter.EVENT_PROPAGATE;
-        const key = event.get_key_symbol();
         if (key === Clutter.KEY_p || key === Clutter.KEY_P)
             toggle();
         else if (node.pinned && (key === Clutter.KEY_Up || key === Clutter.KEY_Down))

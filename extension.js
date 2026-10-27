@@ -416,6 +416,16 @@ export default class GclippyExtension extends Extension {
                     this._rebuildKeepingFocus(menu, kind, id);
                 }
             },
+            onDelete: id => {
+                // Focus moves to the item below, or above when the last one goes.
+                const numbers = [...this._menuNumbers.get(menu)];
+                const index = numbers.findIndex(([, itemId]) => itemId === id);
+                const neighbour = (numbers[index + 1] ?? numbers[index - 1])?.[1];
+                if (this._history.delete(id)) {
+                    this._historyChanged();
+                    this._rebuildKeepingFocus(menu, kind, neighbour);
+                }
+            },
             onSnippet: id => this._onSnippetSelected(id),
             onAction: action => this._onAction(action),
         }, {
@@ -434,7 +444,8 @@ export default class GclippyExtension extends Extension {
     }
 
     /**
-     * Rebuild the open menu so a pinned, unpinned or rearranged item moves at once, and keep the focus on it.
+     * Rebuild the open menu so a pinned, unpinned, rearranged or deleted item changes at once, and
+     * keep the focus on the given item.
      * Deferred because the click or key handler that triggered it belongs to an item being replaced.
      */
     _rebuildKeepingFocus(menu, kind, id) {
@@ -447,9 +458,14 @@ export default class GclippyExtension extends Extension {
             const moved = this._render(menu, kind).get(id);
             if (menu === this._indicator?.menu)
                 this._indicatorDirty = false;
-            // An unpinned item may land in a range folder; open it so the item stays in view.
-            moved?.folder?.setSubmenuShown(true);
-            moved?.item.grab_key_focus();
+            if (!moved) {
+                // Nothing left to follow (the last item was deleted): keep the keyboard working.
+                menu.actor.navigate_focus(null, St.DirectionType.TAB_FORWARD, false);
+                return GLib.SOURCE_REMOVE;
+            }
+            // The item may be in a range folder; open it so the item stays in view.
+            moved.folder?.setSubmenuShown(true);
+            moved.item.grab_key_focus();
             return GLib.SOURCE_REMOVE;
         });
     }

@@ -215,6 +215,7 @@ export default class SmokeExtension extends Extension {
         gclippy = await this._testReorder(gclippy, settings);
         await this._testStartFocus(gclippy, settings);
         await this._testSideSubmenus(gclippy, settings);
+        await this._testDeleteKey(gclippy, settings);
 
         gclippy.openPreferences();
         await wait(3000);
@@ -344,6 +345,61 @@ export default class SmokeExtension extends Extension {
         pointer.run_dispose();
         keyboard.run_dispose();
         return gclippy;
+    }
+
+    async _testDeleteKey(gclippy, settings) {
+        const clipboard = St.Clipboard.get_default();
+        const keyboard = Clutter.get_default_backend().get_default_seat()
+            .create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        const menu = gclippy._pointerMenu.menu;
+        const focused = () => global.stage.get_key_focus()?.label?.text;
+        const itemFor = text => menu._getMenuItems().find(item => item.label?.text.endsWith(` ${text}`));
+        const texts = () => gclippy._history.sorted(false).map(item => item.text).join(',');
+        const press = async keyval => {
+            keyboard.notify_keyval(GLib.get_monotonic_time(), keyval, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(GLib.get_monotonic_time(), keyval, Clutter.KeyState.RELEASED);
+            await wait(300);
+        };
+
+        // Pins ra, rc, rb (1-3), then history d3, d2, d1 (4-6).
+        settings.set_boolean('confirm-clear-history', false);
+        gclippy._clearHistory();
+        settings.reset('confirm-clear-history');
+        for (const text of ['d1', 'd2', 'd3']) {
+            clipboard.set_text(St.ClipboardType.CLIPBOARD, text);
+            await wait(300);
+        }
+
+        gclippy._popUp('history');
+        await wait(300);
+        await press(Clutter.KEY_Delete);
+        check('Delete removes the focused item and keeps the menu open',
+            !gclippy._history.sorted(false).some(item => item.text === 'd3') && menu.isOpen, texts());
+        check('focus moves to the next item', focused() === '4. d2', focused());
+        check('Delete does not paste', await clipboardText() === 'd3');
+
+        itemFor('d1').grab_key_focus();
+        await press(Clutter.KEY_Delete);
+        check('deleting the last item focuses the one above',
+            !gclippy._history.sorted(false).some(item => item.text === 'd1') && focused() === '4. d2', `${focused()} ${texts()}`);
+
+        itemFor('ra').grab_key_focus();
+        await press(Clutter.KEY_Delete);
+        check('Delete removes pinned items too', gclippy._history.pinned().map(item => item.text).join() === 'rc,rb' &&
+            focused() === '1. rc', `${focused()} pins=${gclippy._history.pinned().map(item => item.text)}`);
+
+        itemFor('d2').grab_key_focus();
+        await press(Clutter.KEY_KP_Delete);
+        check('keypad Delete works', !gclippy._history.sorted(false).some(item => item.text === 'd2') &&
+            focused() === '2. rb', `${focused()} ${texts()}`);
+
+        await press(Clutter.KEY_Delete);
+        itemFor('rc').grab_key_focus();
+        await press(Clutter.KEY_Delete);
+        check('deleting everything leaves an open, empty menu', gclippy._history.size === 0 && menu.isOpen &&
+            labels(menu).includes('No items'), JSON.stringify(labels(menu)));
+        menu.close();
+        keyboard.run_dispose();
     }
 
     async _testSideSubmenus(gclippy, settings) {
