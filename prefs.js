@@ -79,7 +79,8 @@ function menuPage(settings) {
 
     const layout = new Adw.PreferencesGroup({title: 'Layout'});
     layout.add(switchRow(settings, 'show-indicator', 'Show icon in the top bar'));
-    layout.add(switchRow(settings, 'snippets-above-history', 'Show snippets above history'));
+    layout.add(switchRow(settings, 'snippets-above-history', 'Show snippets before history',
+        'Between pinned items and history; when off, after history'));
     layout.add(spinRow(settings, 'inline-limit', 'Items shown inline', 0, 999,
         'History items listed directly in the menu before the numbered folders'));
     layout.add(spinRow(settings, 'folder-limit', 'Items per folder', 1, 999));

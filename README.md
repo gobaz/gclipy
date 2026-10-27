@@ -23,7 +23,8 @@ the same extension API, but those versions are untested.
   - numbered items, counting continuously from pinned items through history,
     with older history grouped into "6 - 15", "16 - 25"… submenus
   - the 5 most recent items shown directly in the menu (configurable)
-  - snippets above or below history
+  - in the main menu: Pinned, then Snippet, then History (snippets can be moved
+    after History in settings)
   - folders (history ranges and snippet folders) open beside the menu, by
     hovering or with Right/Enter; Left goes back
 - Pinned items: click the pin icon on a history item, or press Ctrl+P while it
@@ -80,7 +81,8 @@ record history. Disable one of them to avoid duplicate menus and shortcuts.
 
 ## Snippets
 
-**Edit Snippets** opens `snippets.json` in your default editor. The menu
+**Edit Snippets** opens `snippets.json` in your default text editor (the app set
+for plain text files, not the one for JSON, which is often a browser). The menu
 reloads when you save it. If the file is invalid, you get a notification and the
 previous snippets stay in the menu. `title` defaults to the content and
 `enabled` defaults to `true`.

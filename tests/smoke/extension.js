@@ -99,6 +99,17 @@ export default class SmokeExtension extends Extension {
 
         check('example snippets seeded', gclippy._folders.length === 1 && gclippy._snippetsFile.exists());
 
+        // Edit Snippets uses the plain-text editor; the lookup is stubbed so no app starts here.
+        const getDefault = Gio.AppInfo.get_default_for_type;
+        const launched = [];
+        Gio.AppInfo.get_default_for_type = type => ({launch: files => launched.push(`${type} ${files[0].get_basename()}`)});
+        try {
+            gclippy._onAction('edit-snippets');
+        } finally {
+            Gio.AppInfo.get_default_for_type = getDefault;
+        }
+        check('Edit Snippets opens snippets.json in the text editor', launched.join() === 'text/plain snippets.json', launched.join());
+
         const clipboard = St.Clipboard.get_default();
         clipboard.set_text(St.ClipboardType.CLIPBOARD, 'smoke one');
         await wait(300);
@@ -127,6 +138,15 @@ export default class SmokeExtension extends Extension {
         const snippetLabels = labels(gclippy._pointerMenu.menu);
         check('snippets popup lists folders', snippetLabels.includes('Examples'), JSON.stringify(snippetLabels));
         gclippy._pointerMenu.menu.close();
+
+        // Pasting a snippet copies it but does not add it to history. The next test checks that
+        // the following clipboard change is recorded again.
+        const historyBefore = JSON.stringify(gclippy._history.sorted(false).map(item => item.text));
+        gclippy._onSnippetSelected('0/0');
+        await wait(300);
+        check('pasting a snippet copies it', await clipboardText() === 'Hello!');
+        check('pasting a snippet leaves history unchanged',
+            JSON.stringify(gclippy._history.sorted(false).map(item => item.text)) === historyBefore, historyBefore);
 
         // Selecting the older item copies it back, which moves it to the top.
         const older = gclippy._history.sorted(false)[1];

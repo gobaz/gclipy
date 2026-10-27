@@ -64,8 +64,9 @@
       <summary>Show icons next to folders and snippets</summary>
     </key>
     <key name="snippets-above-history" type="b">
-      <default>false</default>
-      <summary>Show snippets above history in the main menu</summary>
+      <default>true</default>
+      <summary>Show snippets between pinned items and history in the main menu</summary>
+      <description>When off, snippets come after history.</description>
     </key>
     <key name="inline-limit" type="i">
       <range min="0" max="999"/>

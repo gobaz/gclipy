@@ -292,6 +292,8 @@ export default class GclippyExtension extends Extension {
         const snippet = this._folders.flatMap(folder => folder.snippets).find(s => s.id === id);
         if (!snippet)
             return;
+        // Snippets are already one click away, so pasting one should not fill the history.
+        this._monitor.ignoreNextChange();
         this._monitor.setText(snippet.content);
         this._pasteSoon();
     }
@@ -307,11 +309,30 @@ export default class GclippyExtension extends Extension {
             this._clearHistoryWithConfirmation();
             break;
         case 'edit-snippets':
-            Gio.AppInfo.launch_default_for_uri(this._snippetsFile.file.get_uri(), null);
+            this._editSnippets();
             break;
         case 'settings':
             this.openPreferences();
             break;
+        }
+    }
+
+    /**
+     * Open snippets.json in the default text editor. The default app for JSON is often a browser,
+     * which can only show the file, so the plain-text handler is preferred.
+     */
+    _editSnippets() {
+        const file = this._snippetsFile.file;
+        const context = global.create_app_launch_context(0, -1);
+        try {
+            const editor = Gio.AppInfo.get_default_for_type('text/plain', false);
+            if (editor)
+                editor.launch([file], context);
+            else
+                Gio.AppInfo.launch_default_for_uri(file.get_uri(), context);
+        } catch (e) {
+            logError(e, 'gclippy: failed to open snippets');
+            Main.notify('gclippy', `Could not open ${file.get_path()}: ${e.message}`);
         }
     }
 

@@ -94,6 +94,19 @@ test('menu: snippets skip disabled folders and snippets', () => {
     assertEqual(buildSnippetNodes([], OPTIONS), []);
 });
 
+test('menu: main menu puts snippets between pinned items and history', () => {
+    const pinned = [{id: 'p', text: 'pin', pinned: true}];
+    const lists = {pinned, recent: history(1)};
+    assertEqual(shape(buildMainMenu(lists, FOLDERS, {...OPTIONS, inlineLimit: 5, snippetsAboveHistory: true})), [
+        'Pinned', '1. pin', 'Snippet', {Work: ['1. Hi', '2. Bye']}, 'separator', 'History', '2. item 0',
+        'separator', 'Clear History', 'Edit Snippets', 'Settings…',
+    ]);
+    assertEqual(shape(buildMainMenu(lists, FOLDERS, {...OPTIONS, inlineLimit: 5, snippetsAboveHistory: false})), [
+        'Pinned', '1. pin', 'History', '2. item 0', 'separator', 'Snippet', {Work: ['1. Hi', '2. Bye']},
+        'separator', 'Clear History', 'Edit Snippets', 'Settings…',
+    ]);
+});
+
 test('menu: main menu order', () => {
     assertEqual(shape(buildMainMenu(recent([]), FOLDERS, OPTIONS)), [
         'History', 'separator', 'Snippet', {Work: ['1. Hi', '2. Bye']},
