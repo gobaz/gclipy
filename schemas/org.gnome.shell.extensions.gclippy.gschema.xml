@@ -123,6 +123,11 @@
       <default>true</default>
       <summary>Paste the selected item into the focused window</summary>
     </key>
+    <key name="number-keys" type="b">
+      <default>true</default>
+      <summary>Paste history items by pressing their number</summary>
+      <description>While a gclippy menu is open, 1-9 paste items 1-9 and 0 pastes item 10 (0-9 when numbering starts at 0).</description>
+    </key>
     <key name="delete-modifier" type="s">
       <choices>
         <choice value="none"/><choice value="ctrl"/><choice value="shift"/><choice value="alt"/><choice value="super"/>

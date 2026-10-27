@@ -18,13 +18,18 @@ the same extension API, but those versions are untested.
   recorded.
 - Snippet folders, read from `~/.local/share/gclippy/snippets.json`.
 - Clipy's menu layout:
-  - numbered items, with history grouped into "1 - 10", "11 - 20"… submenus
+  - numbered items, counting continuously from pinned items through history,
+    with older history grouped into "6 - 15", "16 - 25"… submenus
   - the 5 most recent items shown directly in the menu (configurable)
   - snippets above or below history
 - Pinned items: click the pin icon on a history item, or press Ctrl+P while it
   is highlighted, to keep it in a "Pinned" section above History. Pins are
   never removed by Clear History, periodic clearing or the history size limit.
   Click the pin again to unpin, or delete the item with the delete modifier.
+- Number keys: while a menu is open, press 1–9 to paste item 1–9, or 0 for
+  item 10, including items inside folders. The keypad works with NumLock on. On
+  layouts whose number row types letters (Lithuanian, French…) the keys still
+  work by position. You can turn this off under Settings → General → Paste.
 - Selecting an item copies it and pastes it into the focused window. Terminals
   get Ctrl+Shift+V and everything else gets Ctrl+V.
 - Optional modifiers that delete an item, or paste it and then delete it.

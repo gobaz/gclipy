@@ -1,5 +1,6 @@
 // gclippy: Clipy's clipboard history and snippet menus for GNOME Shell.
 
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
@@ -8,7 +9,8 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {HistoryStore, itemsFromJSON} from './lib/historyStore.js';
 import {ImageStore} from './lib/images.js';
-import {buildHistoryNodes, buildMainMenu, buildSnippetNodes} from './lib/menuModel.js';
+import {buildHistoryNodes, buildMainMenu, buildSnippetNodes, historyNumbers} from './lib/menuModel.js';
+import {digitForKey, numberForDigit} from './lib/numberKeys.js';
 import {historyAction, matchesApp} from './lib/paste.js';
 import {EXAMPLE_SNIPPETS, parseSnippets} from './lib/snippetStore.js';
 import {defaultDataDir, JsonFile} from './lib/storage.js';
@@ -57,7 +59,10 @@ export default class GclippyExtension extends Extension {
             recordImages: () => this._settings.get_boolean('record-images'),
         });
         this._paster = new Paster();
+        // Number to history item id for each rendered menu, used by the number keys.
+        this._menuNumbers = new Map();
         this._pointerMenu = new PointerMenu();
+        this._watchNumberKeys(this._pointerMenu.menu);
         this._indicator = null;
         this._dialog = null;
         this._clearTimeoutId = 0;
@@ -113,6 +118,7 @@ export default class GclippyExtension extends Extension {
         this._folders = null;
         this._historyFile = null;
         this._snippetsFile = null;
+        this._menuNumbers = null;
         this._images = null;
         this._imageCancellable = null;
         this._imageCleanupId = 0;
@@ -223,12 +229,16 @@ export default class GclippyExtension extends Extension {
             this._historyChanged();
     }
 
-    _onHistorySelected(id, event) {
+    /**
+     * @param {string} id
+     * @param {Set<string>} pressed modifiers held while selecting
+     */
+    _onHistorySelected(id, pressed) {
         const item = this._history.get(id);
         if (!item)
             return;
         const action = historyAction({
-            pressed: pressedModifiers(event),
+            pressed,
             deleteModifier: this._settings.get_string('delete-modifier'),
             pasteDeleteModifier: this._settings.get_string('paste-delete-modifier'),
         });
@@ -354,8 +364,9 @@ export default class GclippyExtension extends Extension {
             history: () => buildHistoryNodes(history, options),
             snippets: () => buildSnippetNodes(this._folders, options),
         }[kind]();
+        this._menuNumbers.set(menu, historyNumbers(nodes));
         renderMenu(menu, nodes, {
-            onHistory: (id, event) => this._onHistorySelected(id, event),
+            onHistory: (id, event) => this._onHistorySelected(id, pressedModifiers(event)),
             onPin: (id, pinned) => {
                 if (this._history.setPinned(id, pinned))
                     this._historyChanged();
@@ -393,6 +404,7 @@ export default class GclippyExtension extends Extension {
         const show = this._settings.get_boolean('show-indicator');
         if (show && !this._indicator) {
             this._indicator = createIndicator();
+            this._watchNumberKeys(this._indicator.menu);
             this._indicator.menu.connect('open-state-changed', (_menu, open) => {
                 if (!open && this._indicatorDirty)
                     this._renderIndicator();
@@ -400,9 +412,34 @@ export default class GclippyExtension extends Extension {
             this._renderIndicator();
             Main.panel.addToStatusArea(this.uuid, this._indicator);
         } else if (!show && this._indicator) {
+            this._menuNumbers.delete(this._indicator.menu);
             this._indicator.destroy();
             this._indicator = null;
         }
+    }
+
+    _watchNumberKeys(menu) {
+        menu.actor.connect('key-press-event', (_actor, event) => this._onMenuKey(menu, event));
+    }
+
+    _onMenuKey(menu, event) {
+        if (!this._settings.get_boolean('number-keys'))
+            return Clutter.EVENT_PROPAGATE;
+        // Leave Ctrl, Alt and Super combinations to other shortcuts such as Ctrl+P. Shift is allowed
+        // because some layouts (e.g. French) need it to type digits.
+        const blocked = Clutter.ModifierType.CONTROL_MASK | Clutter.ModifierType.MOD1_MASK |
+            Clutter.ModifierType.SUPER_MASK | Clutter.ModifierType.MOD4_MASK;
+        if (event.get_state() & blocked)
+            return Clutter.EVENT_PROPAGATE;
+        const digit = digitForKey(event.get_key_symbol(), event.get_key_code());
+        const id = digit === null ? null
+            : this._menuNumbers.get(menu)?.get(numberForDigit(digit, this._settings.get_boolean('start-at-zero')));
+        if (!id)
+            return Clutter.EVENT_PROPAGATE;
+        menu.itemActivated();
+        // No modifiers: a Shift needed to type the digit must not trigger the delete modifier.
+        this._onHistorySelected(id, new Set());
+        return Clutter.EVENT_STOP;
     }
 
     _onSettingChanged(key) {

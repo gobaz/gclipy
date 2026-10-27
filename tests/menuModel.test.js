@@ -1,4 +1,5 @@
-import {buildHistoryNodes, buildMainMenu, buildSnippetNodes} from '../lib/menuModel.js';
+import {buildHistoryNodes, buildMainMenu, buildSnippetNodes, historyNumbers} from '../lib/menuModel.js';
+import {digitForKey, numberForDigit} from '../lib/numberKeys.js';
 import {numberedTitle, trimmedMenuTitle, truncate} from '../lib/titles.js';
 import {assertEqual, test} from './harness.js';
 
@@ -42,7 +43,7 @@ test('menu: all history in range submenus by default', () => {
         'History',
         {'1 - 10': ['1. item 0', '2. item 1', '3. item 2', '4. item 3', '5. item 4',
             '6. item 5', '7. item 6', '8. item 7', '9. item 8', '10. item 9']},
-        {'11 - 12': ['1. item 10', '2. item 11']},
+        {'11 - 12': ['11. item 10', '12. item 11']},
     ]);
 });
 
@@ -52,8 +53,8 @@ test('menu: inline items then ranges, starting at zero', () => {
         'History',
         '0. item 0',
         '1. item 1',
-        {'2 - 3': ['0. item 2', '1. item 3']},
-        {'4 - 4': ['0. item 4']},
+        {'2 - 3': ['2. item 2', '3. item 3']},
+        {'4 - 4': ['4. item 4']},
     ]);
 });
 
@@ -96,13 +97,14 @@ test('menu: main menu order', () => {
     ]);
 });
 
-test('menu: pinned section above history with its own numbering', () => {
+test('menu: numbering continues from pinned items into history and folders', () => {
     const pinned = [{id: 'p0', text: 'pin zero', pinned: true}, {id: 'p1', text: 'pin one', pinned: true}];
     const nodes = buildHistoryNodes({pinned, recent: history(3)}, {...OPTIONS, inlineLimit: 1, folderLimit: 5});
     assertEqual(shape(nodes), [
         'Pinned', '1. pin zero', '2. pin one',
-        'History', '1. item 0', {'2 - 3': ['1. item 1', '2. item 2']},
+        'History', '3. item 0', {'4 - 5': ['4. item 1', '5. item 2']},
     ]);
+    assertEqual([...historyNumbers(nodes)], [[1, 'p0'], [2, 'p1'], [3, 'id0'], [4, 'id1'], [5, 'id2']]);
     assertEqual(nodes.filter(node => node.type === 'history').map(node => node.pinned), [true, true, false]);
 });
 
@@ -111,4 +113,22 @@ test('menu: pinned items stay inline even with inline limit 0', () => {
     const nodes = buildHistoryNodes({pinned, recent: []}, OPTIONS);
     assertEqual(nodes.filter(node => node.type === 'history').length, 12);
     assertEqual(nodes.some(node => node.type === 'submenu'), false);
+});
+
+test('menu: numbers in the main menu ignore snippets', () => {
+    const nodes = buildMainMenu({pinned: [], recent: history(2)}, FOLDERS, {...OPTIONS, inlineLimit: 1});
+    assertEqual([...historyNumbers(nodes)], [[1, 'id0'], [2, 'id1']]);
+});
+
+test('number keys: digits, keypad and number-row position', () => {
+    assertEqual(digitForKey(0x31, 0), 1, '"1" keysym');
+    assertEqual(digitForKey(0x30, 0), 0);
+    assertEqual(digitForKey(0xffb7, 0), 7, 'keypad 7');
+    assertEqual(digitForKey(0x1b1, 10), 1, 'Lithuanian ą on the 1 key');
+    assertEqual(digitForKey(0x1b9, 18), 9);
+    assertEqual(digitForKey(0xe0, 19), 0, 'French à on the 0 key');
+    assertEqual(digitForKey(0x61, 38), null, 'letter a');
+    assertEqual(numberForDigit(0, false), 10);
+    assertEqual(numberForDigit(0, true), 0);
+    assertEqual(numberForDigit(3, false), 3);
 });

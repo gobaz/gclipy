@@ -144,6 +144,6 @@ test('menu: image items', () => {
         showTooltips: true, markNumbers: true, startAtZero: false};
     const image = {id: 'i', kind: 'image', hash: 'abc', text: '', width: 1920, height: 1080, pinned: false};
     const [, node] = buildHistoryNodes({pinned: [], recent: [image]}, options);
-    assertEqual(node, {type: 'history', id: 'i', title: '1. (Image) 1920×1080', tooltip: null, pinned: false,
+    assertEqual(node, {type: 'history', id: 'i', number: 1, title: '1. (Image) 1920×1080', tooltip: null, pinned: false,
         image: {hash: 'abc', width: 1920, height: 1080}});
 });

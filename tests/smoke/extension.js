@@ -130,16 +130,15 @@ export default class SmokeExtension extends Extension {
 
         // Selecting the older item copies it back, which moves it to the top.
         const older = gclippy._history.sorted(false)[1];
-        gclippy._onHistorySelected(older.id, null);
+        gclippy._onHistorySelected(older.id, new Set());
         await wait(300);
         check('selecting an item copies it', await clipboardText() === 'smoke one');
         check('selected item moves to the top', gclippy._history.sorted(false)[0].text === 'smoke one');
 
         // Selecting with the delete modifier held removes the item without copying it.
         settings.set_string('delete-modifier', 'shift');
-        const shiftEvent = {get_state: () => Clutter.ModifierType.SHIFT_MASK};
         const deleteTarget = gclippy._history.sorted(false)[1];
-        gclippy._onHistorySelected(deleteTarget.id, shiftEvent);
+        gclippy._onHistorySelected(deleteTarget.id, new Set(['shift']));
         await wait(300);
         settings.reset('delete-modifier');
         check('delete modifier removes the item', gclippy._history.size === 1 && !gclippy._history.get(deleteTarget.id));
@@ -154,7 +153,7 @@ export default class SmokeExtension extends Extension {
         // Paste-and-delete copies the item but must not record that copy again.
         settings.set_string('paste-delete-modifier', 'shift');
         const pasteDeleteTarget = gclippy._history.sorted(false)[1];
-        gclippy._onHistorySelected(pasteDeleteTarget.id, shiftEvent);
+        gclippy._onHistorySelected(pasteDeleteTarget.id, new Set(['shift']));
         await wait(300);
         settings.reset('paste-delete-modifier');
         check('paste-delete copies the item', await clipboardText() === pasteDeleteTarget.text);
@@ -191,6 +190,7 @@ export default class SmokeExtension extends Extension {
 
         await this._testImages(gclippy, settings);
         gclippy = await this._testPins(gclippy, settings);
+        await this._testNumberKeys(gclippy, settings);
 
         gclippy.openPreferences();
         await wait(3000);
@@ -234,7 +234,7 @@ export default class SmokeExtension extends Extension {
         gclippy._popUp('history');
         const reopened = labels(menu());
         check('pinned section above history', JSON.stringify(reopened.slice(0, 4)) ===
-            JSON.stringify(['Pinned', '1. pin me', 'History', '1. other']), JSON.stringify(reopened));
+            JSON.stringify(['Pinned', '1. pin me', 'History', '2. other']), JSON.stringify(reopened));
 
         // Ctrl+P on the focused item unpins it.
         itemFor('pin me').grab_key_focus();
@@ -297,6 +297,91 @@ export default class SmokeExtension extends Extension {
         return gclippy;
     }
 
+    async _testNumberKeys(gclippy, settings) {
+        const clipboard = St.Clipboard.get_default();
+        const keyboard = Clutter.get_default_backend().get_default_seat()
+            .create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        const time = () => GLib.get_monotonic_time();
+        const tapKeyval = keyval => {
+            keyboard.notify_keyval(time(), keyval, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time(), keyval, Clutter.KeyState.RELEASED);
+        };
+        const menu = gclippy._pointerMenu.menu;
+
+        // Known state: pins "pin me" (1) and the 64x64 image (2) survive the clear; then n2 (3), n1 (4).
+        settings.set_boolean('confirm-clear-history', false);
+        gclippy._clearHistory();
+        settings.reset('confirm-clear-history');
+        for (const text of ['n1', 'n2']) {
+            clipboard.set_text(St.ClipboardType.CLIPBOARD, text);
+            await wait(300);
+        }
+
+        gclippy._popUp('history');
+        check('numbers continue from pinned items', JSON.stringify(labels(menu).slice(0, 6)) ===
+            JSON.stringify(['Pinned', '1. pin me', '2. (Image) 64×64', 'History', '3. n2', '4. n1']), JSON.stringify(labels(menu)));
+        tapKeyval(Clutter.KEY_3);
+        await wait(400);
+        check('pressing 3 pastes item 3 and closes the menu', !menu.isOpen && await clipboardText() === 'n2');
+
+        // The keypad types digits only with NumLock on.
+        const KEY_NUMLOCK_EVDEV = 69;
+        const numLock = () => {
+            keyboard.notify_key(time(), KEY_NUMLOCK_EVDEV, Clutter.KeyState.PRESSED);
+            keyboard.notify_key(time(), KEY_NUMLOCK_EVDEV, Clutter.KeyState.RELEASED);
+        };
+        numLock();
+        await wait(200);
+        const keypadSeen = [];
+        const onKey = gclippy._onMenuKey;
+        gclippy._onMenuKey = (...args) => {
+            keypadSeen.push(args[1].get_key_symbol());
+            return onKey.apply(gclippy, args);
+        };
+        gclippy._popUp('main');
+        const KEY_KP4_EVDEV = 75;
+        keyboard.notify_key(time(), KEY_KP4_EVDEV, Clutter.KeyState.PRESSED);
+        keyboard.notify_key(time(), KEY_KP4_EVDEV, Clutter.KeyState.RELEASED);
+        await wait(400);
+        gclippy._onMenuKey = onKey;
+        numLock();
+        check('keypad 4 pastes item 4 from the main menu', !menu.isOpen && await clipboardText() === 'n1',
+            `keysyms seen: ${keypadSeen.map(k => k.toString(16))}, open=${menu.isOpen}`);
+        menu.close();
+
+        settings.set_boolean('number-keys', false);
+        gclippy._popUp('history');
+        tapKeyval(Clutter.KEY_3);
+        await wait(400);
+        check('number-keys=false leaves digits alone', menu.isOpen && await clipboardText() === 'n1');
+        menu.close();
+        settings.reset('number-keys');
+
+        // Lithuanian layout: the 1 key types "ą", so the key's position must be used.
+        const inputSources = new Gio.Settings({schema_id: 'org.gnome.desktop.input-sources'});
+        inputSources.set_value('sources', new GLib.Variant('a(ss)', [['xkb', 'lt']]));
+        await wait(1000);
+        const seen = [];
+        const onMenuKey = gclippy._onMenuKey;
+        gclippy._onMenuKey = (...args) => {
+            seen.push(args[1].get_key_symbol());
+            return onMenuKey.apply(gclippy, args);
+        };
+        gclippy._popUp('history');
+        const KEY_1_EVDEV = 2;
+        keyboard.notify_key(time(), KEY_1_EVDEV, Clutter.KeyState.PRESSED);
+        keyboard.notify_key(time(), KEY_1_EVDEV, Clutter.KeyState.RELEASED);
+        await wait(400);
+        gclippy._onMenuKey = onMenuKey;
+        check('Lithuanian layout: 1 key (types ą) pastes item 1',
+            seen[0] === Clutter.KEY_aogonek && !menu.isOpen && await clipboardText() === 'pin me',
+            `keysyms seen: ${seen.map(k => k.toString(16))}`);
+        inputSources.reset('sources');
+        await wait(500);
+
+        keyboard.run_dispose();
+    }
+
     async _testImages(gclippy, settings) {
         const clipboard = St.Clipboard.get_default();
         const firstImage = () => gclippy._history.sorted(false).find(item => item.kind === 'image');
@@ -332,7 +417,7 @@ export default class SmokeExtension extends Extension {
             await saveScreenshot(menuScreenshot);
         gclippy._pointerMenu.menu.close();
 
-        gclippy._onHistorySelected(png.id, null);
+        gclippy._onHistorySelected(png.id, new Set());
         await wait(300);
         const pasted = await clipboardContent('image/png');
         check('selecting an image puts the PNG on the clipboard',
@@ -355,14 +440,14 @@ export default class SmokeExtension extends Extension {
         settings.reset('record-images');
 
         settings.set_string('delete-modifier', 'shift');
-        gclippy._onHistorySelected(jpeg.id, {get_state: () => Clutter.ModifierType.SHIFT_MASK});
+        gclippy._onHistorySelected(jpeg.id, new Set(['shift']));
         settings.reset('delete-modifier');
         const removed = await waitFor(() => !gclippy._images.imageFile(jpeg.hash).query_exists(null) &&
             !gclippy._images.thumbnailFile(jpeg.hash).query_exists(null));
         check('deleting an image removes its files', removed && gclippy._images.imageFile(png.hash).query_exists(null));
 
         gclippy._images.imageFile(png.hash).delete(null);
-        gclippy._onHistorySelected(png.id, null);
+        gclippy._onHistorySelected(png.id, new Set());
         check('missing image file drops the entry', !gclippy._history.get(png.id));
     }
 }
