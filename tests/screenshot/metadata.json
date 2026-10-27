@@ -1,0 +1,6 @@
+{
+  "uuid": "gclippy-smoke@gclippy.local",
+  "name": "gclippy screenshot",
+  "description": "Fills gclippy with demo content and saves a screenshot of its menu. Used only by `make screenshot`.",
+  "shell-version": ["45", "46", "47", "48"]
+}

@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Runs gclippy and tests/smoke in a headless GNOME Shell with its own D-Bus session,
 # dconf database and data directories, so the running desktop session is not touched.
+# An optional argument names another helper extension under tests/ (e.g. "screenshot").
 set -euo pipefail
+
+helper=${1:-smoke}
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 work=$(mktemp -d -t gclippy-smoke-XXXXXX)
@@ -20,7 +23,8 @@ extensions="$XDG_DATA_HOME/gnome-shell/extensions"
 mkdir -p "$extensions/gclippy@gclippy.local" "$extensions/gclippy-smoke@gclippy.local"
 (cd "$root" && cp -r metadata.json extension.js prefs.js lib shell schemas "$extensions/gclippy@gclippy.local/")
 glib-compile-schemas --strict "$extensions/gclippy@gclippy.local/schemas"
-cp "$root"/tests/smoke/* "$extensions/gclippy-smoke@gclippy.local/"
+# Every helper uses the gclippy-smoke uuid so the enabled-extensions list below stays the same.
+cp "$root"/tests/"$helper"/* "$extensions/gclippy-smoke@gclippy.local/"
 
 log="$work/shell.log"
 dbus-run-session -- bash -c '

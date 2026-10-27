@@ -5,6 +5,8 @@ Clipboard history and snippet menus for GNOME Shell, ported from the macOS app
 because only code inside the shell can watch the clipboard, register global
 shortcuts and paste into other windows on Wayland.
 
+![The gclippy menu: pinned items, numbered history with an image thumbnail, a preview of the highlighted item, and snippets](docs/screenshot.png)
+
 Tested on GNOME Shell 46. `metadata.json` also lists 45, 47 and 48, which share
 the same extension API, but those versions are untested.
 
@@ -120,6 +122,8 @@ tests/    unit tests for lib/, plus a headless shell smoke test
     prefs window open, and `SMOKE_MENU_SCREENSHOT=/path.png` one of the history
     menu with image thumbnails.
   - `KEEP_LOG=1` keeps the shell log.
+- `make screenshot` regenerates `docs/screenshot.png` in the same headless shell, using the demo
+  content in `tests/screenshot/extension.js`.
 - Watch logs from the real session with `journalctl -f /usr/bin/gnome-shell`.
 
 ## License

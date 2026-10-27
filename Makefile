@@ -3,7 +3,7 @@ UUID := gclippy@gclippy.local
 INSTALL_DIR := $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 SOURCES := metadata.json extension.js prefs.js lib shell schemas
 
-.PHONY: test smoke schemas install uninstall pack clean
+.PHONY: test smoke screenshot schemas install uninstall pack clean
 
 test:
 	gjs -m tests/run.js
@@ -28,3 +28,7 @@ clean:
 
 smoke:
 	tests/smoke.sh
+
+screenshot:
+	mkdir -p docs
+	SCREENSHOT_PATH=$(CURDIR)/docs/screenshot.png tests/smoke.sh screenshot
