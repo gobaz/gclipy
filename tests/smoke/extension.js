@@ -340,6 +340,11 @@ export default class SmokeExtension extends Extension {
         await wait(100);
         gclippy._popUp('history');
         await wait(400);
+        // The first item is highlighted as the menu opens, before it has been laid out.
+        const first = menu._getMenuItems().find(item => item.label?.text.startsWith('1. '));
+        const [, firstY] = first.get_transformed_position();
+        check('preview for the first item after opening is placed', preview.visible &&
+            Number.isFinite(preview.x) && Math.abs(preview.y - firstY) < 2, `preview ${preview.x},${preview.y} item y=${firstY}`);
         const [menuX, menuY] = menu.actor.get_transformed_position();
         const [menuWidth, menuHeight] = menu.actor.get_transformed_size();
 

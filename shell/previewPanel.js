@@ -1,6 +1,8 @@
 // Shows the highlighted item's text in a panel beside the menu. Keeping it outside the menu
 // means showing and hiding it never resizes the menu, which used to make the menu jump.
 
+import GLib from 'gi://GLib';
+import Meta from 'gi://Meta';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 
@@ -24,6 +26,7 @@ export class PreviewPanel {
         });
         Main.layoutManager.uiGroup.add_child(this.actor);
         this._item = null;
+        this._laterId = 0;
     }
 
     /**
@@ -49,15 +52,44 @@ export class PreviewPanel {
     }
 
     hide() {
+        this._stopWaitingForLayout();
         this._item = null;
         this.actor.hide();
     }
 
     _show(item, text, menu) {
+        this._stopWaitingForLayout();
         this._item = item;
         // Already limited to the configured number of lines by lib/menuModel.js.
         this._label.text = text;
+        if (this._place(item, menu)) {
+            this._reveal();
+            return;
+        }
+        // Right after a menu opens or is rebuilt, the highlighted item has not been laid out
+        // and its position is NaN. Retry before each redraw until it has one; doing this from
+        // the item's allocation signal would move the panel in the middle of a layout pass.
+        this.actor.hide();
+        this._laterId = global.compositor.get_laters().add(Meta.LaterType.BEFORE_REDRAW, () => {
+            if (this._item !== item)
+                return GLib.SOURCE_REMOVE;
+            if (!this._place(item, menu))
+                return GLib.SOURCE_CONTINUE;
+            this._laterId = 0;
+            this._reveal();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
 
+    _stopWaitingForLayout() {
+        if (this._laterId) {
+            global.compositor.get_laters().remove(this._laterId);
+            this._laterId = 0;
+        }
+    }
+
+    /** @returns {boolean} false when the menu or item has no usable position yet */
+    _place(item, menu) {
         const box = menu.actor;
         const monitor = Main.layoutManager.findMonitorForActor(box) ?? Main.layoutManager.primaryMonitor;
         // The menu slides in using a translation, and the first item is highlighted as it opens;
@@ -74,13 +106,19 @@ export class PreviewPanel {
         if (x + width > monitor.x + monitor.width)
             x = menuX - GAP - width;
         const y = Math.min(Math.max(itemY, monitor.y), monitor.y + monitor.height - height);
+        if (!Number.isFinite(x) || !Number.isFinite(y))
+            return false;
         this.actor.set_position(Math.round(Math.max(x, monitor.x)), Math.round(y));
+        return true;
+    }
 
+    _reveal() {
         this.actor.get_parent().set_child_above_sibling(this.actor, null);
         this.actor.show();
     }
 
     destroy() {
+        this._stopWaitingForLayout();
         this.actor.destroy();
     }
 }

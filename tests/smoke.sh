@@ -12,6 +12,9 @@ export XDG_DATA_HOME="$work/data" XDG_CONFIG_HOME="$work/config" XDG_CACHE_HOME=
 export XDG_RUNTIME_DIR="$work/runtime"
 mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
 unset DISPLAY WAYLAND_DISPLAY
+# Plain GNOME: distribution session modes (e.g. Ubuntu's) load extra system extensions whose
+# own warnings would make results depend on the machine.
+export GNOME_SHELL_SESSION_MODE=user
 
 extensions="$XDG_DATA_HOME/gnome-shell/extensions"
 mkdir -p "$extensions/gclippy@gclippy.local" "$extensions/gclippy-smoke@gclippy.local"
@@ -32,6 +35,13 @@ dbus-run-session -- bash -c '
 grep -E "SMOKE (ok|FAIL)" "$log" | sed 's/^.*SMOKE /    /'
 # Anything else gclippy logged is worth a look: prefs errors, warnings, stack traces.
 grep -iE "gclippy|prefs\.js|JS ERROR|TypeError|ReferenceError" "$log" | grep -v "SMOKE" | sed 's/^/log: /' || true
-if grep -q "SMOKE FAIL\|timed out" "$log"; then
+# Criticals from the shell's libraries point at real bugs (NaN layout, stale objects) even when
+# every check passes. Gjs criticals at shutdown come from killing the shell and are ignored.
+criticals=$(grep -E "(Clutter|GLib|GLib-GIO|St|mutter|libmutter)-CRITICAL" "$log" || true)
+if [[ -n "$criticals" ]]; then
+    echo "criticals in the shell log:"
+    echo "$criticals" | sort | uniq -c | sed 's/^/    /'
+fi
+if grep -q "SMOKE FAIL\|timed out" "$log" || [[ -n "$criticals" ]]; then
     exit 1
 fi
