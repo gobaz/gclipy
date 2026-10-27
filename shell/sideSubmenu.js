@@ -20,7 +20,7 @@ const OVERLAP = 4;
 const openSubmenus = new WeakMap();
 
 export const SideSubmenuItem = GObject.registerClass({
-    GTypeName: 'GclippySideSubmenuItem',
+    GTypeName: 'GclipySideSubmenuItem',
 }, class SideSubmenuItem extends PopupMenu.PopupBaseMenuItem {
     /**
      * @param {string} text

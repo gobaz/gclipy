@@ -1,4 +1,4 @@
-// Fills gclippy with demo content inside a headless shell (tests/smoke.sh screenshot) and saves
+// Fills gclipy with demo content inside a headless shell (tests/smoke.sh screenshot) and saves
 // a cropped screenshot of the open menu to $SCREENSHOT_PATH. Used for the README image.
 
 import Clutter from 'gi://Clutter';
@@ -11,10 +11,10 @@ import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-const UUID = 'gclippy@gobaz.github.io';
+const UUID = 'gclipy@gobaz.github.io';
 const MARGIN = 24;
 
-// The shell re-enables this helper when gclippy is toggled; the module flag keeps it to one run.
+// The shell re-enables this helper when gclipy is toggled; the module flag keeps it to one run.
 let started = false;
 
 const wait = ms => new Promise(resolve => {
@@ -102,15 +102,15 @@ export default class ScreenshotHelper extends Extension {
         background.set_string('primary-color', '#2e3440');
         Main.overview.hide();
 
-        const gclippy = Main.extensionManager.lookup(UUID).stateObj;
+        const gclipy = Main.extensionManager.lookup(UUID).stateObj;
         const clipboard = St.Clipboard.get_default();
         const copy = async text => {
             clipboard.set_text(St.ClipboardType.CLIPBOARD, text);
             await wait(250);
         };
         const pinNewest = () => {
-            gclippy._history.setPinned(gclippy._history.unpinned(false)[0].id, true);
-            gclippy._historyChanged();
+            gclipy._history.setPinned(gclipy._history.unpinned(false)[0].id, true);
+            gclipy._historyChanged();
         };
 
         await copy('https://github.com/gobaz/gclipy');
@@ -120,7 +120,7 @@ export default class ScreenshotHelper extends Extension {
         clipboard.set_content(St.ClipboardType.CLIPBOARD, 'image/png', demoImage(800, 450));
         await wait(1000);
         await copy('Meeting moved to 14:00, room 3B');
-        await copy('make install && gnome-extensions enable gclippy@gobaz.github.io');
+        await copy('make install && gnome-extensions enable gclipy@gobaz.github.io');
         await copy('function greet(name) {\n    return `Hello, ${name}!`;\n}');
 
         // The menu opens at the pointer.
@@ -130,10 +130,10 @@ export default class ScreenshotHelper extends Extension {
         await wait(200);
         pointer.run_dispose();
 
-        gclippy._popUp('main');
+        gclipy._popUp('main');
         await wait(800);
-        await saveArea(path, areaAround([gclippy._pointerMenu.menu.actor, gclippy._preview.actor]));
-        gclippy._pointerMenu.menu.close();
+        await saveArea(path, areaAround([gclipy._pointerMenu.menu.actor, gclipy._preview.actor]));
+        gclipy._pointerMenu.menu.close();
         console.log(`SMOKE ok screenshot saved to ${path}`);
     }
 }

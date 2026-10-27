@@ -39,7 +39,7 @@ export class ClipboardMonitor {
         });
     }
 
-    /** Skip the next clipboard change, e.g. one gclippy makes itself before deleting the item. */
+    /** Skip the next clipboard change, e.g. one gclipy makes itself before deleting the item. */
     ignoreNextChange() {
         this._ignoreCount++;
     }

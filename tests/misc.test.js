@@ -36,7 +36,7 @@ test('snippets: invalid files throw', () => {
 });
 
 test('storage: save, load, missing and corrupt files', () => {
-    const dir = GLib.dir_make_tmp('gclippy-test-XXXXXX');
+    const dir = GLib.dir_make_tmp('gclipy-test-XXXXXX');
     const file = new JsonFile(GLib.build_filenamev([dir, 'nested']), 'data.json');
     assertEqual(file.load(), undefined);
     file.saveNow({a: 1});

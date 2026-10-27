@@ -27,7 +27,7 @@ const CLEAR_INTERVALS = [
     [604800, 'Every 7 days'],
 ];
 
-export default class GclippyPreferences extends ExtensionPreferences {
+export default class GclipyPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings();
         window.set_default_size(640, 720);

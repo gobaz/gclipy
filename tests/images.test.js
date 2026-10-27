@@ -16,7 +16,7 @@ function makeImage(width, height, format = 'png') {
 
 function withTempDir(fn) {
     return async () => {
-        const dir = GLib.dir_make_tmp('gclippy-images-XXXXXX');
+        const dir = GLib.dir_make_tmp('gclipy-images-XXXXXX');
         try {
             await fn(dir);
         } finally {

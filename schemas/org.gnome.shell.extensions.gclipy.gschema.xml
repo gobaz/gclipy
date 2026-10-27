@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.gnome.shell.extensions.gclippy" path="/org/gnome/shell/extensions/gclippy/">
+  <schema id="org.gnome.shell.extensions.gclipy" path="/org/gnome/shell/extensions/gclipy/">
 
     <!-- History -->
     <key name="max-history" type="i">
@@ -24,7 +24,7 @@
     <key name="record-images" type="b">
       <default>true</default>
       <summary>Record copied images</summary>
-      <description>Images are kept as PNG files in ~/.local/share/gclippy/images. Text is recorded instead when a copy offers both.</description>
+      <description>Images are kept as PNG files in ~/.local/share/gclipy/images. Text is recorded instead when a copy offers both.</description>
     </key>
     <key name="ignore-concealed" type="b">
       <default>false</default>
@@ -133,7 +133,7 @@
     <key name="number-keys" type="b">
       <default>true</default>
       <summary>Paste history items by pressing their number</summary>
-      <description>While a gclippy menu is open, 1-9 paste items 1-9 and 0 pastes item 10 (0-9 when numbering starts at 0).</description>
+      <description>While a gclipy menu is open, 1-9 paste items 1-9 and 0 pastes item 10 (0-9 when numbering starts at 0).</description>
     </key>
     <key name="delete-modifier" type="s">
       <choices>

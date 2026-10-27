@@ -1,4 +1,4 @@
-// gclippy: Clipy's clipboard history and snippet menus for GNOME Shell.
+// gclipy: Clipy's clipboard history and snippet menus for GNOME Shell.
 
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
@@ -36,7 +36,7 @@ const MENU_KEYS = new Set([
     'show-images', 'thumbnail-width', 'thumbnail-height', 'show-move-buttons',
 ]);
 
-export default class GclippyExtension extends Extension {
+export default class GclipyExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
         const dataDir = defaultDataDir();
@@ -58,7 +58,7 @@ export default class GclippyExtension extends Extension {
         this._cleanUpImages();
 
         this._monitor = new ClipboardMonitor({
-            onClip: clip => this._onClip(clip).catch(e => logError(e, 'gclippy: failed to record clipboard')),
+            onClip: clip => this._onClip(clip).catch(e => logError(e, 'gclipy: failed to record clipboard')),
             recordImages: () => this._settings.get_boolean('record-images'),
         });
         this._paster = new Paster();
@@ -112,7 +112,7 @@ export default class GclippyExtension extends Extension {
         try {
             this._historyFile.flush();
         } catch (e) {
-            logError(e, 'gclippy: failed to save history');
+            logError(e, 'gclipy: failed to save history');
         }
         this._cleanUpImages();
 
@@ -146,13 +146,13 @@ export default class GclippyExtension extends Extension {
             return itemsFromJSON(this._historyFile.load());
         } catch (e) {
             // Keep the unreadable file for the user instead of overwriting it on the next save.
-            logError(e, 'gclippy: failed to load history');
+            logError(e, 'gclipy: failed to load history');
             const backup = `${this._historyFile.path}.corrupt-${GLib.DateTime.new_now_local().format('%Y%m%d%H%M%S')}`;
             try {
                 this._historyFile.file.move(Gio.File.new_for_path(backup), Gio.FileCopyFlags.NONE, null, null);
-                Main.notify('gclippy', `History could not be read and was moved to ${backup}`);
+                Main.notify('gclipy', `History could not be read and was moved to ${backup}`);
             } catch (moveError) {
-                logError(moveError, 'gclippy: failed to back up unreadable history');
+                logError(moveError, 'gclipy: failed to back up unreadable history');
             }
             return [];
         }
@@ -164,7 +164,7 @@ export default class GclippyExtension extends Extension {
                 this._snippetsFile.saveNow(EXAMPLE_SNIPPETS);
             return parseSnippets(this._snippetsFile.load());
         } catch (e) {
-            Main.notify('gclippy', `Snippets could not be loaded from ${this._snippetsFile.path}: ${e.message}`);
+            Main.notify('gclipy', `Snippets could not be loaded from ${this._snippetsFile.path}: ${e.message}`);
             return this._folders ?? [];
         }
     }
@@ -205,7 +205,7 @@ export default class GclippyExtension extends Extension {
         try {
             this._images.collectGarbage(this._history.imageHashes());
         } catch (e) {
-            logError(e, 'gclippy: failed to clean up images');
+            logError(e, 'gclipy: failed to clean up images');
         }
     }
 
@@ -225,7 +225,7 @@ export default class GclippyExtension extends Extension {
                 image = await this._images.save(clip.bytes, clip.mimetype, this._imageCancellable);
             } catch (e) {
                 if (!e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
-                    logError(e, 'gclippy: failed to store clipboard image');
+                    logError(e, 'gclipy: failed to store clipboard image');
                 return;
             }
             // The extension may have been disabled while the image was being written.
@@ -278,8 +278,8 @@ export default class GclippyExtension extends Extension {
         try {
             bytes = this._images.load(item.hash);
         } catch (e) {
-            logError(e, 'gclippy: image file missing');
-            Main.notify('gclippy', 'This image is no longer available and was removed from history.');
+            logError(e, 'gclipy: image file missing');
+            Main.notify('gclipy', 'This image is no longer available and was removed from history.');
             if (this._history.delete(item.id))
                 this._historyChanged();
             return false;
@@ -331,8 +331,8 @@ export default class GclippyExtension extends Extension {
             else
                 Gio.AppInfo.launch_default_for_uri(file.get_uri(), context);
         } catch (e) {
-            logError(e, 'gclippy: failed to open snippets');
-            Main.notify('gclippy', `Could not open ${file.get_path()}: ${e.message}`);
+            logError(e, 'gclipy: failed to open snippets');
+            Main.notify('gclipy', `Could not open ${file.get_path()}: ${e.message}`);
         }
     }
 

@@ -1,11 +1,11 @@
-# gclippy
+# gclipy
 
 Clipboard history and snippet menus for GNOME Shell, ported from the macOS app
 [Clipy](https://github.com/Clipy/Clipy). It runs as a GNOME Shell extension
 because only code inside the shell can watch the clipboard, register global
 shortcuts and paste into other windows on Wayland.
 
-![The gclippy menu: pinned items, numbered history with an image thumbnail, a preview of the highlighted item, and snippets](docs/screenshot.png)
+![The gclipy menu: pinned items, numbered history with an image thumbnail, a preview of the highlighted item, and snippets](docs/screenshot.png)
 
 Tested on GNOME Shell 46. `metadata.json` also lists 45, 47 and 48, which share
 the same extension API, but those versions are untested.
@@ -18,7 +18,7 @@ the same extension API, but those versions are untested.
   "(Image) W×H" with a thumbnail and are pasted back as PNG. When a copy offers
   both text and an image, as spreadsheets and office apps do, the text is
   recorded.
-- Snippet folders, read from `~/.local/share/gclippy/snippets.json`.
+- Snippet folders, read from `~/.local/share/gclipy/snippets.json`.
 - Clipy's menu layout:
   - numbered items, counting continuously from pinned items through history,
     with older history grouped into "6 - 15", "16 - 25"… submenus
@@ -73,7 +73,7 @@ On X11, restart GNOME Shell with Alt+F2, `r`, Enter. On Wayland, log out and
 back in. Then enable it:
 
 ```sh
-gnome-extensions enable gclippy@gobaz.github.io
+gnome-extensions enable gclipy@gobaz.github.io
 ```
 
 On X11, `make enable` does all of this: it installs, restarts GNOME Shell (by
@@ -107,17 +107,17 @@ previous snippets stay in the menu. `title` defaults to the content and
 }
 ```
 
-History is stored in `~/.local/share/gclippy/history.json`. Images are kept
+History is stored in `~/.local/share/gclipy/history.json`. Images are kept
 next to it in `images/` as `<sha256>.png` plus a `.thumb.png` for the menu. They
 are deleted once no history entry refers to them, and copies larger than 32 MiB
 are skipped. If `history.json`
-becomes unreadable, gclippy renames it to `history.json.corrupt-<time>` and
+becomes unreadable, gclipy renames it to `history.json.corrupt-<time>` and
 starts a new history.
 
 ## Privacy
 
-Everything stays on your computer: gclippy makes no network connections and
-keeps history only in `~/.local/share/gclippy`. Content that password managers
+Everything stays on your computer: gclipy makes no network connections and
+keeps history only in `~/.local/share/gclipy`. Content that password managers
 mark as secret is never recorded (Settings → General), and you can exclude
 applications or clear history periodically or when the extension is disabled.
 
@@ -126,7 +126,7 @@ applications or clear history periodically or when the extension is disabled.
 1. Run `make test` and `make smoke`, bump `version-name` in `metadata.json`,
    and run `make pack`.
 2. Log in at <https://extensions.gnome.org> and upload
-   `dist/gclippy@gobaz.github.io.shell-extension.zip` at
+   `dist/gclipy@gobaz.github.io.shell-extension.zip` at
    <https://extensions.gnome.org/upload/>.
 3. Wait for the manual review (see the
    [review guidelines](https://gjs.guide/extensions/review-guidelines/review-guidelines.html)).
@@ -145,9 +145,9 @@ tests/    unit tests for lib/, plus a headless shell smoke test
 
 - `make test` runs the `lib/` unit tests with `gjs -m`. No shell is needed.
 - `make smoke` (`tests/smoke.sh`) starts a headless GNOME Shell with its own
-  D-Bus session, dconf database and data directories. It loads gclippy plus the
+  D-Bus session, dconf database and data directories. It loads gclipy plus the
   `tests/smoke` extension, which copies text, opens the menus, selects items,
-  toggles settings, and disables and re-enables gclippy. It does not touch
+  toggles settings, and disables and re-enables gclipy. It does not touch
   your running session.
   - `SMOKE_SCREENSHOT=/path.png make smoke` also saves a screenshot with the
     prefs window open, and `SMOKE_MENU_SCREENSHOT=/path.png` one of the history
@@ -159,4 +159,4 @@ tests/    unit tests for lib/, plus a headless shell smoke test
 
 ## License
 
-MIT. See [LICENSE](LICENSE), which also includes Clipy's MIT notice.
+MIT. See [LICENSE](LICENSE).

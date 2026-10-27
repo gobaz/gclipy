@@ -1,7 +1,7 @@
 {
-  "uuid": "gclippy@gobaz.github.io",
-  "name": "gclippy",
-  "description": "Clipboard history and snippets menu, based on the macOS app Clipy.\n\n- Text and image history, newest first, with numbered items (press 1-9, 0 to paste)\n- Pinned items that survive clearing, rearranged with Ctrl+Up/Down\n- Snippet folders edited as JSON in your text editor\n- Opens at the pointer with Shift+Super+V and pastes into the focused window\n- Skips content marked secret by password managers and excluded apps\n\nHistory is stored locally in ~/.local/share/gclippy and never leaves your computer.",
+  "uuid": "gclipy@gobaz.github.io",
+  "name": "gclipy",
+  "description": "Clipboard history and snippets menu, based on the macOS app Clipy.\n\n- Text and image history, newest first, with numbered items (press 1-9, 0 to paste)\n- Pinned items that survive clearing, rearranged with Ctrl+Up/Down\n- Snippet folders edited as JSON in your text editor\n- Opens at the pointer with Shift+Super+V and pastes into the focused window\n- Skips content marked secret by password managers and excluded apps\n\nHistory is stored locally in ~/.local/share/gclipy and never leaves your computer.",
   "shell-version": [
     "45",
     "46",
@@ -9,6 +9,6 @@
     "48"
   ],
   "url": "https://github.com/gobaz/gclipy",
-  "settings-schema": "org.gnome.shell.extensions.gclippy",
+  "settings-schema": "org.gnome.shell.extensions.gclipy",
   "version-name": "0.1.0"
 }

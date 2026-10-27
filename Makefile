@@ -1,5 +1,5 @@
 # gnome-extensions pack crashes when --out-dir does not exist yet, hence the mkdir.
-UUID := gclippy@gobaz.github.io
+UUID := gclipy@gobaz.github.io
 INSTALL_DIR := $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 SOURCES := metadata.json extension.js prefs.js lib shell schemas
 
