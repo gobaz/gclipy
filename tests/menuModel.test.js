@@ -1,13 +1,13 @@
 import {buildHistoryNodes, buildMainMenu, buildSnippetNodes, historyNumbers} from '../lib/menuModel.js';
 import {digitForKey, numberForDigit} from '../lib/numberKeys.js';
-import {numberedTitle, trimmedMenuTitle, truncate} from '../lib/titles.js';
+import {numberedTitle, previewText, trimmedMenuTitle} from '../lib/titles.js';
 import {assertEqual, test} from './harness.js';
 
 const OPTIONS = {
     inlineLimit: 0,
     folderLimit: 10,
     maxTitleLength: 20,
-    maxTooltipLength: 200,
+    maxPreviewLines: 8,
     showTooltips: true,
     markNumbers: true,
     startAtZero: false,
@@ -35,7 +35,14 @@ test('titles: trims to first line and shortens', () => {
 test('titles: numbering and truncation', () => {
     assertEqual(numberedTitle('x', 3, true), '3. x');
     assertEqual(numberedTitle('x', 3, false), 'x');
-    assertEqual(truncate('abcdef', 3), 'abc');
+});
+
+test('titles: preview counts lines', () => {
+    assertEqual(previewText('one\ntwo\r\nthree', 2), 'one\ntwo\n…');
+    assertEqual(previewText('one\ntwo', 2), 'one\ntwo', 'nothing cut, no ellipsis');
+    assertEqual(previewText('a'.repeat(1000), 8), `${'a'.repeat(300)}…`, 'long lines are cut');
+    assertEqual(previewText('one\ntwo', 0), 'one\n…', 'at least one line');
+    assertEqual(previewText('x'.repeat(500), 8).length, 301, 'a 500-character line is not split into lines');
 });
 
 test('menu: all history in range submenus by default', () => {
@@ -67,8 +74,8 @@ test('menu: empty history has only the label', () => {
 });
 
 test('menu: tooltips follow settings', () => {
-    const [, node] = buildHistoryNodes(recent([{id: 'a', text: 'abcdef'}]), {...OPTIONS, inlineLimit: 1, maxTooltipLength: 3});
-    assertEqual(node.tooltip, 'abc');
+    const [, node] = buildHistoryNodes(recent([{id: 'a', text: 'l1\nl2\nl3'}]), {...OPTIONS, inlineLimit: 1, maxPreviewLines: 2});
+    assertEqual(node.tooltip, 'l1\nl2\n…');
     const [, hidden] = buildHistoryNodes(recent([{id: 'a', text: 'abcdef'}]), {...OPTIONS, inlineLimit: 1, showTooltips: false});
     assertEqual(hidden.tooltip, null);
 });

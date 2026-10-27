@@ -191,6 +191,7 @@ export default class SmokeExtension extends Extension {
         await this._testImages(gclippy, settings);
         gclippy = await this._testPins(gclippy, settings);
         await this._testNumberKeys(gclippy, settings);
+        await this._testPreview(gclippy);
 
         gclippy.openPreferences();
         await wait(3000);
@@ -295,6 +296,65 @@ export default class SmokeExtension extends Extension {
         pointer.run_dispose();
         keyboard.run_dispose();
         return gclippy;
+    }
+
+    async _testPreview(gclippy) {
+        const clipboard = St.Clipboard.get_default();
+        const preview = gclippy._preview.actor;
+        const menu = gclippy._pointerMenu.menu;
+        const itemFor = text => menu._getMenuItems().find(item => item.label?.text.endsWith(text));
+        const pointer = Clutter.get_default_backend().get_default_seat()
+            .create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+
+        clipboard.set_text(St.ClipboardType.CLIPBOARD, 'preview one\npreview two');
+        await wait(300);
+        clipboard.set_text(St.ClipboardType.CLIPBOARD, 'short');
+        await wait(300);
+
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), 200, 150);
+        await wait(100);
+        gclippy._popUp('history');
+        await wait(400);
+        const [menuX, menuY] = menu.actor.get_transformed_position();
+        const [menuWidth, menuHeight] = menu.actor.get_transformed_size();
+
+        const multiLine = itemFor('preview one');
+        multiLine.grab_key_focus();
+        await wait(100);
+        const [, itemY] = multiLine.get_transformed_position();
+        check('preview shows the highlighted text', preview.visible && preview.child.text === 'preview one\npreview two');
+        check('preview sits right of the menu, level with the item',
+            preview.x >= menuX + menuWidth && Math.abs(preview.y - itemY) < 2,
+            `menu x=${menuX}..${menuX + menuWidth} y=${menuY}, item y=${itemY}, preview ${preview.x},${preview.y}`);
+        const screenshot = GLib.getenv('SMOKE_PREVIEW_SCREENSHOT');
+        if (screenshot)
+            await saveScreenshot(screenshot);
+
+        itemFor('short').grab_key_focus();
+        await wait(100);
+        check('preview follows the highlight', preview.visible && preview.child.text === 'short');
+        itemFor('(Image) 64×64').grab_key_focus();
+        await wait(100);
+        check('items without text hide the preview', !preview.visible);
+        check('menu size never changes', JSON.stringify(menu.actor.get_transformed_size()) ===
+            JSON.stringify([menuWidth, menuHeight]), `${menuHeight} -> ${menu.actor.get_transformed_size()[1]}`);
+        menu.close();
+        await wait(300);
+        check('closing the menu hides the preview', !preview.visible);
+
+        // Near the right edge the panel moves to the left of the menu.
+        const monitor = Main.layoutManager.primaryMonitor;
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), monitor.x + monitor.width - 20, 150);
+        await wait(100);
+        gclippy._popUp('history');
+        await wait(400);
+        itemFor('preview one').grab_key_focus();
+        await wait(100);
+        const [edgeMenuX] = menu.actor.get_transformed_position();
+        check('preview flips left at the screen edge', preview.visible && preview.x + preview.width <= edgeMenuX &&
+            preview.x >= monitor.x, `menu x=${edgeMenuX}, preview x=${preview.x} w=${preview.width}`);
+        menu.close();
+        pointer.run_dispose();
     }
 
     async _testNumberKeys(gclippy, settings) {

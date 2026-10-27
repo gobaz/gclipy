@@ -1,7 +1,6 @@
 // Turns a lib/menuModel.js tree into PopupMenu items.
 
 import Clutter from 'gi://Clutter';
-import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
@@ -26,16 +25,14 @@ import {fitWithin} from '../lib/images.js';
  * @param {boolean} options.showIcons
  * @param {{width: number, height: number, uri: (hash: string) => string} | null} options.thumbnails
  *   null hides image thumbnails
+ * @param {import('./previewPanel.js').PreviewPanel} options.preview shows the highlighted item's text
  */
-export function renderMenu(menu, nodes, handlers, {showIcons, thumbnails}) {
+export function renderMenu(menu, nodes, handlers, {showIcons, thumbnails, preview}) {
     menu.removeAll();
-    const preview = new PreviewItem();
-    addNodes(menu, nodes, handlers, {showIcons, thumbnails, preview});
+    addNodes(menu, nodes, handlers, {showIcons, thumbnails, preview, topMenu: menu});
     // A menu holding only labels counts as empty and refuses to open, so say so explicitly.
     if (menu.isEmpty())
         menu.addMenuItem(new PopupMenu.PopupMenuItem('No items', {reactive: false, can_focus: false}));
-    // Shell menus have no tooltips, so the highlighted item's text is shown at the bottom instead.
-    menu.addMenuItem(preview);
 }
 
 function addNodes(menu, nodes, handlers, context) {
@@ -63,7 +60,7 @@ function addNodes(menu, nodes, handlers, context) {
                 item.add_child(thumbnail(context.thumbnails, node.image));
             addPinButton(item, node, handlers.onPin);
             item.connect('activate', (_item, event) => handlers.onHistory(node.id, event));
-            context.preview.track(item, node.tooltip);
+            context.preview.track(item, node.tooltip, context.topMenu);
             menu.addMenuItem(item);
             break;
         }
@@ -72,7 +69,7 @@ function addNodes(menu, nodes, handlers, context) {
                 ? new PopupMenu.PopupImageMenuItem(node.title, 'text-x-generic-symbolic')
                 : new PopupMenu.PopupMenuItem(node.title);
             item.connect('activate', () => handlers.onSnippet(node.id));
-            context.preview.track(item, node.tooltip);
+            context.preview.track(item, node.tooltip, context.topMenu);
             menu.addMenuItem(item);
             break;
         }
@@ -126,40 +123,6 @@ function thumbnail({width: maxWidth, height: maxHeight, uri}, image) {
             `width: ${width}px; height: ${height}px;`,
         y_align: Clutter.ActorAlign.CENTER,
     });
-}
-
-class PreviewItem extends PopupMenu.PopupMenuSection {
-    constructor() {
-        super();
-        this._label = new St.Label({style: 'font-size: smaller; max-width: 32em;', opacity: 180});
-        this._label.clutter_text.line_wrap = true;
-        this._label.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-        this._label.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
-        const item = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
-        item.add_child(this._label);
-        this.addMenuItem(item);
-        this.actor.hide();
-    }
-
-    /**
-     * @param {PopupMenu.PopupBaseMenuItem} item
-     * @param {string | null} text
-     */
-    track(item, text) {
-        if (!text)
-            return;
-        item.connect('notify::active', () => {
-            if (item.active) {
-                this._current = item;
-                // Long previews are capped by line count rather than characters.
-                this._label.text = text.split('\n').slice(0, 8).join('\n');
-                this.actor.show();
-            } else if (this._current === item) {
-                this._current = null;
-                this.actor.hide();
-            }
-        });
-    }
 }
 
 /**

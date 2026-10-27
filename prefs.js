@@ -99,7 +99,7 @@ function menuPage(settings) {
         items.add(row);
     }
     items.add(switchRow(settings, 'show-tooltips', 'Preview the highlighted item'));
-    items.add(spinRow(settings, 'max-tooltip-length', 'Maximum preview length', 1, 10000));
+    items.add(spinRow(settings, 'max-preview-lines', 'Maximum preview lines', 1, 100));
     page.add(items);
 
     return page;

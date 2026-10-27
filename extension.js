@@ -21,6 +21,7 @@ import {Keybindings} from './shell/keybindings.js';
 import {pressedModifiers, renderMenu} from './shell/menuRenderer.js';
 import {Paster} from './shell/paster.js';
 import {PointerMenu} from './shell/pointerMenu.js';
+import {PreviewPanel} from './shell/previewPanel.js';
 
 const SNIPPETS_RELOAD_DELAY_MS = 300;
 const IMAGE_CLEANUP_DELAY_S = 2;
@@ -30,7 +31,7 @@ const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
 // Settings that only need the menus rebuilt; any other key has its own handler below.
 const MENU_KEYS = new Set([
     'reorder-after-paste', 'show-icons', 'snippets-above-history', 'inline-limit', 'folder-limit', 'max-title-length',
-    'mark-numbers', 'start-at-zero', 'show-clear-history-item', 'show-tooltips', 'max-tooltip-length',
+    'mark-numbers', 'start-at-zero', 'show-clear-history-item', 'show-tooltips', 'max-preview-lines',
     'show-images', 'thumbnail-width', 'thumbnail-height',
 ]);
 
@@ -61,8 +62,10 @@ export default class GclippyExtension extends Extension {
         this._paster = new Paster();
         // Number to history item id for each rendered menu, used by the number keys.
         this._menuNumbers = new Map();
+        // Shell menus have no tooltips; this panel beside the open menu stands in for them.
+        this._preview = new PreviewPanel();
         this._pointerMenu = new PointerMenu();
-        this._watchNumberKeys(this._pointerMenu.menu);
+        this._watchMenu(this._pointerMenu.menu);
         this._indicator = null;
         this._dialog = null;
         this._clearTimeoutId = 0;
@@ -92,6 +95,7 @@ export default class GclippyExtension extends Extension {
         this._dialog?.destroy();
         this._indicator?.destroy();
         this._pointerMenu.destroy();
+        this._preview.destroy();
         this._paster.destroy();
         this._monitor.destroy();
 
@@ -112,6 +116,7 @@ export default class GclippyExtension extends Extension {
         this._dialog = null;
         this._indicator = null;
         this._pointerMenu = null;
+        this._preview = null;
         this._paster = null;
         this._monitor = null;
         this._history = null;
@@ -347,7 +352,7 @@ export default class GclippyExtension extends Extension {
             inlineLimit: s.get_int('inline-limit'),
             folderLimit: s.get_int('folder-limit'),
             maxTitleLength: s.get_int('max-title-length'),
-            maxTooltipLength: s.get_int('max-tooltip-length'),
+            maxPreviewLines: s.get_int('max-preview-lines'),
             showTooltips: s.get_boolean('show-tooltips'),
             markNumbers: s.get_boolean('mark-numbers'),
             startAtZero: s.get_boolean('start-at-zero'),
@@ -375,6 +380,7 @@ export default class GclippyExtension extends Extension {
             onAction: action => this._onAction(action),
         }, {
             showIcons: this._settings.get_boolean('show-icons'),
+            preview: this._preview,
             thumbnails: this._settings.get_boolean('show-images') ? {
                 width: this._settings.get_int('thumbnail-width'),
                 height: this._settings.get_int('thumbnail-height'),
@@ -404,7 +410,7 @@ export default class GclippyExtension extends Extension {
         const show = this._settings.get_boolean('show-indicator');
         if (show && !this._indicator) {
             this._indicator = createIndicator();
-            this._watchNumberKeys(this._indicator.menu);
+            this._watchMenu(this._indicator.menu);
             this._indicator.menu.connect('open-state-changed', (_menu, open) => {
                 if (!open && this._indicatorDirty)
                     this._renderIndicator();
@@ -418,8 +424,12 @@ export default class GclippyExtension extends Extension {
         }
     }
 
-    _watchNumberKeys(menu) {
+    _watchMenu(menu) {
         menu.actor.connect('key-press-event', (_actor, event) => this._onMenuKey(menu, event));
+        menu.connect('open-state-changed', (_menu, open) => {
+            if (!open)
+                this._preview.hide();
+        });
     }
 
     _onMenuKey(menu, event) {
