@@ -26,13 +26,17 @@ import {fitWithin} from '../lib/images.js';
  * @param {{width: number, height: number, uri: (hash: string) => string} | null} options.thumbnails
  *   null hides image thumbnails
  * @param {import('./previewPanel.js').PreviewPanel} options.preview shows the highlighted item's text
+ * @returns {Map<string, {item: PopupMenu.PopupMenuItem, folder: PopupMenu.PopupSubMenuMenuItem | null}>}
+ *   history items by id, with the folder holding each one
  */
 export function renderMenu(menu, nodes, handlers, {showIcons, thumbnails, preview}) {
     menu.removeAll();
-    addNodes(menu, nodes, handlers, {showIcons, thumbnails, preview, topMenu: menu});
+    const historyItems = new Map();
+    addNodes(menu, nodes, handlers, {showIcons, thumbnails, preview, topMenu: menu, historyItems, folder: null});
     // A menu holding only labels counts as empty and refuses to open, so say so explicitly.
     if (menu.isEmpty())
         menu.addMenuItem(new PopupMenu.PopupMenuItem('No items', {reactive: false, can_focus: false}));
+    return historyItems;
 }
 
 function addNodes(menu, nodes, handlers, context) {
@@ -48,7 +52,7 @@ function addNodes(menu, nodes, handlers, context) {
             const item = new PopupMenu.PopupSubMenuMenuItem(node.title, context.showIcons && node.isFolder);
             if (item.icon)
                 item.icon.icon_name = 'folder-symbolic';
-            addNodes(item.menu, node.children, handlers, context);
+            addNodes(item.menu, node.children, handlers, {...context, folder: item});
             menu.addMenuItem(item);
             break;
         }
@@ -61,6 +65,7 @@ function addNodes(menu, nodes, handlers, context) {
             addPinButton(item, node, handlers.onPin);
             item.connect('activate', (_item, event) => handlers.onHistory(node.id, event));
             context.preview.track(item, node.tooltip, context.topMenu);
+            context.historyItems.set(node.id, {item, folder: context.folder});
             menu.addMenuItem(item);
             break;
         }
@@ -85,7 +90,7 @@ function addNodes(menu, nodes, handlers, context) {
 
 /**
  * A pin toggle at the end of a history item, also reachable with Ctrl+P on the focused item.
- * The menu is not rebuilt on toggle, so the item moves section the next time the menu opens.
+ * The icon flips at once; the owner then rebuilds the menu to move the item.
  */
 function addPinButton(item, node, onPin) {
     const icon = new St.Icon({icon_name: 'view-pin-symbolic', style_class: 'popup-menu-icon'});

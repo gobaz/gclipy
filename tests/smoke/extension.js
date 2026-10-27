@@ -230,22 +230,47 @@ export default class SmokeExtension extends Extension {
         check('pin button click pins the item', gclippy._history.get(idOf('pin me'))?.pinned === true);
         check('pin button click keeps the menu open', menu().isOpen);
         check('pin button click does not paste', await clipboardText() === 'other');
-        menu().close();
+        const afterPin = labels(menu());
+        check('pinned item moves to the Pinned section at once', JSON.stringify(afterPin.slice(0, 4)) ===
+            JSON.stringify(['Pinned', '1. pin me', 'History', '2. other']), JSON.stringify(afterPin));
+        check('focus follows the pinned item', global.stage.get_key_focus() === itemFor('pin me'));
 
-        gclippy._popUp('history');
-        const reopened = labels(menu());
-        check('pinned section above history', JSON.stringify(reopened.slice(0, 4)) ===
-            JSON.stringify(['Pinned', '1. pin me', 'History', '2. other']), JSON.stringify(reopened));
-
-        // Ctrl+P on the focused item unpins it.
-        itemFor('pin me').grab_key_focus();
-        for (const [key, state] of [[Clutter.KEY_Control_L, Clutter.KeyState.PRESSED], [Clutter.KEY_p, Clutter.KeyState.PRESSED],
-            [Clutter.KEY_p, Clutter.KeyState.RELEASED], [Clutter.KEY_Control_L, Clutter.KeyState.RELEASED]])
-            keyboard.notify_keyval(time(), key, state);
-        await wait(300);
+        // Ctrl+P on the focused item (still "pin me") unpins it.
+        const ctrlP = async () => {
+            for (const [key, state] of [[Clutter.KEY_Control_L, Clutter.KeyState.PRESSED], [Clutter.KEY_p, Clutter.KeyState.PRESSED],
+                [Clutter.KEY_p, Clutter.KeyState.RELEASED], [Clutter.KEY_Control_L, Clutter.KeyState.RELEASED]])
+                keyboard.notify_keyval(time(), key, state);
+            await wait(300);
+        };
+        await ctrlP();
         check('Ctrl+P toggles the pin', gclippy._history.get(idOf('pin me'))?.pinned === false);
         check('Ctrl+P keeps the menu open', menu().isOpen);
+        const afterUnpin = labels(menu());
+        check('unpinned item moves back to History at once', JSON.stringify(afterUnpin.slice(0, 3)) ===
+            JSON.stringify(['History', '1. other', '2. pin me']), JSON.stringify(afterUnpin));
+        check('focus follows the unpinned item', global.stage.get_key_focus() === itemFor('pin me'));
         menu().close();
+
+        // With every history item in folders, unpinning opens the folder the item lands in.
+        settings.set_int('inline-limit', 0);
+        gclippy._popUp('history');
+        await wait(300);
+        const folder = menu()._getMenuItems().find(item => item.menu?.isOpen !== undefined && item.label?.text.startsWith('1 - '));
+        folder.setSubmenuShown(true);
+        await wait(300);
+        folder.menu._getMenuItems().find(item => item.label?.text.endsWith('pin me')).grab_key_focus();
+        await ctrlP();
+        check('pinning from a folder moves the item out', gclippy._history.get(idOf('pin me'))?.pinned === true &&
+            labels(menu()).slice(0, 2).join() === 'Pinned,1. pin me', JSON.stringify(labels(menu())));
+        await ctrlP();
+        const focused = global.stage.get_key_focus();
+        const landingFolder = menu()._getMenuItems().find(item => item.menu?._getMenuItems?.().includes(focused));
+        check('unpinning into a folder opens it and keeps focus', gclippy._history.get(idOf('pin me'))?.pinned === false &&
+            focused?.label?.text.endsWith('pin me') && landingFolder?.menu.isOpen === true,
+        `focused=${focused?.label?.text} folder=${landingFolder?.label?.text}`);
+        menu().close();
+        settings.reset('inline-limit');
+        gclippy._history.setPinned(idOf('pin me'), false);
 
         // Pins survive clearing and the history limit.
         gclippy._history.setPinned(idOf('pin me'), true);

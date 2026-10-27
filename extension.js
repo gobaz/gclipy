@@ -53,6 +53,7 @@ export default class GclippyExtension extends Extension {
         this._images = new ImageStore(GLib.build_filenamev([dataDir, 'images']));
         this._imageCancellable = new Gio.Cancellable();
         this._imageCleanupId = 0;
+        this._pinRerenderId = 0;
         this._cleanUpImages();
 
         this._monitor = new ClipboardMonitor({
@@ -85,6 +86,8 @@ export default class GclippyExtension extends Extension {
         this._settings.disconnectObject(this);
         this._keybindings.destroy();
         this._imageCancellable.cancel();
+        if (this._pinRerenderId)
+            GLib.source_remove(this._pinRerenderId);
         if (this._imageCleanupId)
             GLib.source_remove(this._imageCleanupId);
         if (this._clearTimeoutId)
@@ -127,6 +130,7 @@ export default class GclippyExtension extends Extension {
         this._images = null;
         this._imageCancellable = null;
         this._imageCleanupId = 0;
+        this._pinRerenderId = 0;
     }
 
     // MARK: - Storage
@@ -361,6 +365,7 @@ export default class GclippyExtension extends Extension {
         };
     }
 
+    /** @returns {Map<string, {item: object, folder: object | null}>} rendered history items by id */
     _render(menu, kind) {
         const options = this._menuOptions();
         const history = {pinned: this._history.pinned(), recent: this._history.unpinned(this._sortByCreatedAt())};
@@ -370,11 +375,13 @@ export default class GclippyExtension extends Extension {
             snippets: () => buildSnippetNodes(this._folders, options),
         }[kind]();
         this._menuNumbers.set(menu, historyNumbers(nodes));
-        renderMenu(menu, nodes, {
+        return renderMenu(menu, nodes, {
             onHistory: (id, event) => this._onHistorySelected(id, pressedModifiers(event)),
             onPin: (id, pinned) => {
-                if (this._history.setPinned(id, pinned))
+                if (this._history.setPinned(id, pinned)) {
                     this._historyChanged();
+                    this._moveAfterPin(menu, kind, id);
+                }
             },
             onSnippet: id => this._onSnippetSelected(id),
             onAction: action => this._onAction(action),
@@ -386,6 +393,27 @@ export default class GclippyExtension extends Extension {
                 height: this._settings.get_int('thumbnail-height'),
                 uri: hash => this._images.thumbnailFile(hash).get_uri(),
             } : null,
+        });
+    }
+
+    /**
+     * Rebuild the open menu so a pinned or unpinned item moves at once, and keep the focus on it.
+     * Deferred because the click or key handler that triggered it belongs to an item being replaced.
+     */
+    _moveAfterPin(menu, kind, id) {
+        if (this._pinRerenderId)
+            GLib.source_remove(this._pinRerenderId);
+        this._pinRerenderId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+            this._pinRerenderId = 0;
+            if (!menu.isOpen)
+                return GLib.SOURCE_REMOVE;
+            const moved = this._render(menu, kind).get(id);
+            if (menu === this._indicator?.menu)
+                this._indicatorDirty = false;
+            // An unpinned item may land in a range folder; open it so the item stays in view.
+            moved?.folder?.setSubmenuShown(true);
+            moved?.item.grab_key_focus();
+            return GLib.SOURCE_REMOVE;
         });
     }
 
