@@ -20,16 +20,16 @@ unset DISPLAY WAYLAND_DISPLAY
 export GNOME_SHELL_SESSION_MODE=user
 
 extensions="$XDG_DATA_HOME/gnome-shell/extensions"
-mkdir -p "$extensions/gclippy@gclippy.local" "$extensions/gclippy-smoke@gclippy.local"
-(cd "$root" && cp -r metadata.json extension.js prefs.js lib shell schemas "$extensions/gclippy@gclippy.local/")
-glib-compile-schemas --strict "$extensions/gclippy@gclippy.local/schemas"
+mkdir -p "$extensions/gclippy@gobaz.github.io" "$extensions/gclippy-smoke@gclippy.local"
+(cd "$root" && cp -r metadata.json extension.js prefs.js lib shell schemas "$extensions/gclippy@gobaz.github.io/")
+glib-compile-schemas --strict "$extensions/gclippy@gobaz.github.io/schemas"
 # Every helper uses the gclippy-smoke uuid so the enabled-extensions list below stays the same.
 cp "$root"/tests/"$helper"/* "$extensions/gclippy-smoke@gclippy.local/"
 
 log="$work/shell.log"
 dbus-run-session -- bash -c '
     gsettings set org.gnome.shell disable-user-extensions false
-    gsettings set org.gnome.shell enabled-extensions "[\"gclippy@gclippy.local\", \"gclippy-smoke@gclippy.local\"]"
+    gsettings set org.gnome.shell enabled-extensions "[\"gclippy@gobaz.github.io\", \"gclippy-smoke@gclippy.local\"]"
     gnome-shell --headless --wayland --no-x11 --virtual-monitor 1280x800 > "$1" 2>&1 &
     shell=$!
     timeout 60 grep -q -m1 "SMOKE DONE" <(tail -n +1 -f "$1") || echo "timed out waiting for the smoke test" >> "$1"

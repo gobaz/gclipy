@@ -73,8 +73,12 @@ On X11, restart GNOME Shell with Alt+F2, `r`, Enter. On Wayland, log out and
 back in. Then enable it:
 
 ```sh
-gnome-extensions enable gclippy@gclippy.local
+gnome-extensions enable gclippy@gobaz.github.io
 ```
+
+On X11, `make enable` does all of this: it installs, restarts GNOME Shell (by
+typing Alt+F2 `r` with `xdotool` if installed, otherwise it asks you to) and
+enables the extension once the shell is back.
 
 `make pack` builds an installable zip in `dist/`.
 
@@ -109,6 +113,27 @@ are deleted once no history entry refers to them, and copies larger than 32 MiB
 are skipped. If `history.json`
 becomes unreadable, gclippy renames it to `history.json.corrupt-<time>` and
 starts a new history.
+
+## Privacy
+
+Everything stays on your computer: gclippy makes no network connections and
+keeps history only in `~/.local/share/gclippy`. Content that password managers
+mark as secret is never recorded (Settings → General), and you can exclude
+applications or clear history periodically or when the extension is disabled.
+
+## Publishing to extensions.gnome.org
+
+1. Run `make test` and `make smoke`, bump `version-name` in `metadata.json`,
+   and run `make pack`.
+2. Log in at <https://extensions.gnome.org> and upload
+   `dist/gclippy@gobaz.github.io.shell-extension.zip` at
+   <https://extensions.gnome.org/upload/>.
+3. Wait for the manual review (see the
+   [review guidelines](https://gjs.guide/extensions/review-guidelines/review-guidelines.html)).
+   Updates are uploaded the same way with the same UUID; each one is reviewed
+   again.
+
+Only list GNOME versions in `shell-version` that you have tested.
 
 ## Development
 

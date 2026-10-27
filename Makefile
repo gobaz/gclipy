@@ -1,9 +1,9 @@
 # gnome-extensions pack crashes when --out-dir does not exist yet, hence the mkdir.
-UUID := gclippy@gclippy.local
+UUID := gclippy@gobaz.github.io
 INSTALL_DIR := $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 SOURCES := metadata.json extension.js prefs.js lib shell schemas
 
-.PHONY: test smoke screenshot schemas install uninstall pack clean
+.PHONY: test smoke screenshot schemas install enable uninstall pack clean
 
 test:
 	gjs -m tests/run.js
@@ -15,6 +15,10 @@ install: schemas
 	rm -rf $(INSTALL_DIR)
 	mkdir -p $(INSTALL_DIR)
 	cp -r $(SOURCES) $(INSTALL_DIR)/
+
+# Installs, restarts GNOME Shell (X11) and enables the extension.
+enable: install
+	tools/enable.sh $(UUID)
 
 uninstall:
 	rm -rf $(INSTALL_DIR)

@@ -11,7 +11,7 @@ import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-const UUID = 'gclippy@gclippy.local';
+const UUID = 'gclippy@gobaz.github.io';
 const MARGIN = 24;
 
 // The shell re-enables this helper when gclippy is toggled; the module flag keeps it to one run.
@@ -120,7 +120,7 @@ export default class ScreenshotHelper extends Extension {
         clipboard.set_content(St.ClipboardType.CLIPBOARD, 'image/png', demoImage(800, 450));
         await wait(1000);
         await copy('Meeting moved to 14:00, room 3B');
-        await copy('make install && gnome-extensions enable gclippy@gclippy.local');
+        await copy('make install && gnome-extensions enable gclippy@gobaz.github.io');
         await copy('function greet(name) {\n    return `Hello, ${name}!`;\n}');
 
         // The menu opens at the pointer.

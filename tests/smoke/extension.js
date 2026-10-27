@@ -12,7 +12,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {ExtensionState} from 'resource:///org/gnome/shell/misc/extensionUtils.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-const UUID = 'gclippy@gclippy.local';
+const UUID = 'gclippy@gobaz.github.io';
 
 // Disabling gclippy makes the shell disable and re-enable extensions loaded after it,
 // including this one. The module stays loaded, so this flag keeps the test to one run.
