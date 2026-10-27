@@ -194,6 +194,7 @@ export default class SmokeExtension extends Extension {
         await this._testPreview(gclippy);
         gclippy = await this._testReorder(gclippy, settings);
         await this._testStartFocus(gclippy, settings);
+        await this._testSideSubmenus(gclippy, settings);
 
         gclippy.openPreferences();
         await wait(3000);
@@ -268,7 +269,7 @@ export default class SmokeExtension extends Extension {
         const focused = global.stage.get_key_focus();
         const landingFolder = menu()._getMenuItems().find(item => item.menu?._getMenuItems?.().includes(focused));
         check('unpinning into a folder opens it and keeps focus', gclippy._history.get(idOf('pin me'))?.pinned === false &&
-            focused?.label?.text.endsWith('pin me') && landingFolder?.menu.isOpen === true,
+            focused?.label?.text.endsWith('pin me') && landingFolder?.isSubmenuOpen === true,
         `focused=${focused?.label?.text} folder=${landingFolder?.label?.text}`);
         menu().close();
         settings.reset('inline-limit');
@@ -323,6 +324,109 @@ export default class SmokeExtension extends Extension {
         pointer.run_dispose();
         keyboard.run_dispose();
         return gclippy;
+    }
+
+    async _testSideSubmenus(gclippy, settings) {
+        const clipboard = St.Clipboard.get_default();
+        const seat = Clutter.get_default_backend().get_default_seat();
+        const keyboard = seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        const pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        const time = () => GLib.get_monotonic_time();
+        const menu = gclippy._pointerMenu.menu;
+        const folder = title => menu._getMenuItems().find(item => item.label?.text === title);
+        const focused = () => global.stage.get_key_focus();
+        const tap = async keyval => {
+            keyboard.notify_keyval(time(), keyval, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time(), keyval, Clutter.KeyState.RELEASED);
+            await wait(200);
+        };
+        const pointAt = async (actor, wait_ms = 100) => {
+            const [x, y] = actor.get_transformed_position();
+            const [width, height] = actor.get_transformed_size();
+            pointer.notify_absolute_motion(time(), x + width / 2, y + height / 2);
+            await wait(wait_ms);
+        };
+        const click = async actor => {
+            await pointAt(actor);
+            pointer.notify_button(time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+            pointer.notify_button(time(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+            await wait(300);
+        };
+        const open = async () => {
+            pointer.notify_absolute_motion(time(), 300, 120);
+            await wait(100);
+            gclippy._popUp('history');
+            await wait(400);
+        };
+
+        // Pins ra, rc, rb (1-3); history t3, t2, t1, s2, s1 in folders of two: 4 - 5, 6 - 7, 8 - 8.
+        for (const text of ['t1', 't2', 't3']) {
+            clipboard.set_text(St.ClipboardType.CLIPBOARD, text);
+            await wait(300);
+        }
+        settings.set_int('inline-limit', 0);
+        settings.set_int('folder-limit', 2);
+
+        await open();
+        const first = folder('4 - 5');
+        check('side submenu: focus starts on the first folder', focused() === first);
+        await tap(Clutter.KEY_Right);
+        const panel = first._panel;
+        const [menuX] = menu.actor.get_transformed_position();
+        const [menuWidth] = menu.actor.get_transformed_size();
+        const [panelX] = panel.get_transformed_position();
+        const [, headerY] = first.get_transformed_position();
+        const [, childY] = first.menu._getMenuItems()[0].get_transformed_position();
+        check('Right opens the folder beside the menu, focused on its first item',
+            first.isSubmenuOpen && focused()?.label?.text === '4. t3' &&
+            panelX >= menuX + menuWidth - 8 && Math.abs(childY - headerY) < 3,
+        `focus=${focused()?.label?.text} panel x=${panelX} menu right=${menuX + menuWidth} child y=${childY} header y=${headerY}`);
+        const [previewX] = gclippy._preview.actor.get_transformed_position();
+        check('preview sits beside the side panel', gclippy._preview.actor.visible &&
+            previewX >= panelX + panel.width, `preview x=${previewX} panel right=${panelX + panel.width}`);
+        await tap(Clutter.KEY_Down);
+        check('Down moves inside the side panel', focused()?.label?.text === '5. t2');
+        await tap(Clutter.KEY_Down);
+        check('Down at the end stays inside the side panel', panel.contains(focused()));
+        await tap(Clutter.KEY_Left);
+        check('Left closes the side panel and returns to the folder', !first.isSubmenuOpen && focused() === first);
+
+        await tap(Clutter.KEY_Right);
+        first.grab_key_focus();
+        await tap(Clutter.KEY_Down);
+        check('Down on an open folder moves to the next menu item and closes the panel',
+            focused() === folder('6 - 7') && !first.isSubmenuOpen, focused()?.label?.text);
+        await tap(Clutter.KEY_Return);
+        check('Enter opens a folder', folder('6 - 7').isSubmenuOpen && focused()?.label?.text === '6. t1');
+        await tap(Clutter.KEY_Return);
+        check('Enter on an item inside pastes it and closes the menu', !menu.isOpen && await clipboardText() === 't1');
+
+        // Mouse: hover opens, moving to another folder switches, clicking an item pastes.
+        await open();
+        const second = folder('8 - 8');
+        await pointAt(folder('4 - 5'), 400);
+        check('hovering a folder opens it', folder('4 - 5').isSubmenuOpen);
+        await pointAt(folder('4 - 5').menu._getMenuItems()[1], 400);
+        check('moving into the side panel keeps it open', folder('4 - 5').isSubmenuOpen);
+        await pointAt(second, 500);
+        check('hovering another folder switches to it', second.isSubmenuOpen && !folder('4 - 5').isSubmenuOpen);
+        const screenshot = GLib.getenv('SMOKE_SUBMENU_SCREENSHOT');
+        if (screenshot)
+            await saveScreenshot(screenshot);
+        await click(second.menu._getMenuItems()[0]);
+        check('clicking an item in the side panel pastes it', !menu.isOpen && await clipboardText() === 's1');
+
+        await open();
+        await click(folder('4 - 5'));
+        check('clicking a folder toggles it without closing the menu', menu.isOpen && folder('4 - 5').isSubmenuOpen);
+        menu.close();
+        await wait(200);
+        check('closing the menu closes its side panel', !folder('4 - 5')?.isSubmenuOpen);
+
+        settings.reset('inline-limit');
+        settings.reset('folder-limit');
+        keyboard.run_dispose();
+        pointer.run_dispose();
     }
 
     async _testStartFocus(gclippy, settings) {

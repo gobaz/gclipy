@@ -6,6 +6,7 @@ import St from 'gi://St';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import {fitWithin} from '../lib/images.js';
+import {SideSubmenuItem} from './sideSubmenu.js';
 
 /**
  * @typedef {object} MenuHandlers
@@ -28,13 +29,18 @@ import {fitWithin} from '../lib/images.js';
  * @param {{width: number, height: number, uri: (hash: string) => string} | null} options.thumbnails
  *   null hides image thumbnails
  * @param {import('./previewPanel.js').PreviewPanel} options.preview shows the highlighted item's text
- * @returns {Map<string, {item: PopupMenu.PopupMenuItem, folder: PopupMenu.PopupSubMenuMenuItem | null}>}
+ * @returns {Map<string, {item: PopupMenu.PopupMenuItem, folder: SideSubmenuItem | null}>}
  *   history items by id, with the folder holding each one
  */
 export function renderMenu(menu, nodes, handlers, {showIcons, showMoveButtons, thumbnails, preview}) {
     menu.removeAll();
     const historyItems = new Map();
-    addNodes(menu, nodes, handlers, {showIcons, showMoveButtons, thumbnails, preview, topMenu: menu, historyItems, folder: null});
+    addNodes(menu, nodes, handlers, {
+        showIcons, showMoveButtons, thumbnails, preview, historyItems,
+        folder: null,
+        // The preview panel is placed beside whichever menu or side panel holds the item.
+        previewMenu: menu,
+    });
     // A menu holding only labels counts as empty and refuses to open, so say so explicitly.
     if (menu.isEmpty())
         menu.addMenuItem(new PopupMenu.PopupMenuItem('No items', {reactive: false, can_focus: false}));
@@ -51,11 +57,11 @@ function addNodes(menu, nodes, handlers, context) {
             menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             break;
         case 'submenu': {
-            const item = new PopupMenu.PopupSubMenuMenuItem(node.title, context.showIcons && node.isFolder);
+            const item = new SideSubmenuItem(node.title, context.showIcons && node.isFolder);
             if (item.icon)
                 item.icon.icon_name = 'folder-symbolic';
-            addNodes(item.menu, node.children, handlers, {...context, folder: item});
             menu.addMenuItem(item);
+            addNodes(item.menu, node.children, handlers, {...context, folder: item, previewMenu: item.panelMenu});
             break;
         }
         case 'history': {
@@ -66,7 +72,7 @@ function addNodes(menu, nodes, handlers, context) {
                 item.add_child(thumbnail(context.thumbnails, node.image));
             addPinControls(item, node, handlers, context.showMoveButtons);
             item.connect('activate', (_item, event) => handlers.onHistory(node.id, event));
-            context.preview.track(item, node.tooltip, context.topMenu);
+            context.preview.track(item, node.tooltip, context.previewMenu);
             context.historyItems.set(node.id, {item, folder: context.folder});
             menu.addMenuItem(item);
             break;
@@ -76,7 +82,7 @@ function addNodes(menu, nodes, handlers, context) {
                 ? new PopupMenu.PopupImageMenuItem(node.title, 'text-x-generic-symbolic')
                 : new PopupMenu.PopupMenuItem(node.title);
             item.connect('activate', () => handlers.onSnippet(node.id));
-            context.preview.track(item, node.tooltip, context.topMenu);
+            context.preview.track(item, node.tooltip, context.previewMenu);
             menu.addMenuItem(item);
             break;
         }

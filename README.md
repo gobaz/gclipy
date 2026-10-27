@@ -24,6 +24,8 @@ the same extension API, but those versions are untested.
     with older history grouped into "6 - 15", "16 - 25"… submenus
   - the 5 most recent items shown directly in the menu (configurable)
   - snippets above or below history
+  - folders (history ranges and snippet folders) open beside the menu, by
+    hovering or with Right/Enter; Left goes back
 - Pinned items: click the pin icon on a history item, or press Ctrl+P while it
   is highlighted, to keep it in a "Pinned" section above History. Pins are
   never removed by Clear History, periodic clearing or the history size limit.
