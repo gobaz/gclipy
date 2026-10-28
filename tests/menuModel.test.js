@@ -1,5 +1,5 @@
 import {buildHistoryNodes, buildMainMenu, buildSnippetNodes, historyNumbers, historyOrder} from '../lib/menuModel.js';
-import {digitForKey, numberForDigit} from '../lib/numberKeys.js';
+import {entryLabel, numberForKey} from '../lib/numberKeys.js';
 import {numberedTitle, previewText, trimmedMenuTitle} from '../lib/titles.js';
 import {assertEqual, test} from './harness.js';
 
@@ -35,6 +35,10 @@ test('titles: trims to first line and shortens', () => {
 test('titles: numbering and truncation', () => {
     assertEqual(numberedTitle('x', 3, true), '3. x');
     assertEqual(numberedTitle('x', 3, false), 'x');
+    assertEqual(numberedTitle('x', 10, true), '0. x', '0 is the tenth, as on the keyboard');
+    assertEqual(numberedTitle('x', 11, true), 'A. x', 'then letters');
+    assertEqual([1, 9, 10, 11, 12, 36, 37].map(n => entryLabel(n, false)), ['1', '9', '0', 'A', 'B', 'Z', '37']);
+    assertEqual([0, 9, 10, 35, 36].map(n => entryLabel(n, true)), ['0', '9', 'A', 'Z', '36'], 'from 0: 0 is first, A tenth');
 });
 
 test('titles: preview counts lines', () => {
@@ -48,9 +52,9 @@ test('titles: preview counts lines', () => {
 test('menu: all history in numbered folders by default, numbered from 1 inside', () => {
     assertEqual(shape(buildHistoryNodes(recent(history(12)), OPTIONS)), [
         'History',
-        {'1. Older (10)': ['1. item 0', '2. item 1', '3. item 2', '4. item 3', '5. item 4',
-            '6. item 5', '7. item 6', '8. item 7', '9. item 8', '10. item 9']},
-        {'2. Older (2)': ['1. item 10', '2. item 11']},
+        {'1. 1-10': ['1. item 0', '2. item 1', '3. item 2', '4. item 3', '5. item 4',
+            '6. item 5', '7. item 6', '8. item 7', '9. item 8', '0. item 9']},
+        {'2. 11-12': ['1. item 10', '2. item 11']},
     ]);
 });
 
@@ -60,11 +64,11 @@ test('menu: inline items then folders, starting at zero', () => {
         'History',
         '0. item 0',
         '1. item 1',
-        {'2. Older (2)': ['0. item 2', '1. item 3']},
-        {'3. Older (1)': ['0. item 4']},
+        {'2. 2-3': ['0. item 2', '1. item 3']},
+        {'3. 4-4': ['0. item 4']},
     ]);
     const unnumbered = buildHistoryNodes(recent(history(3)), {...OPTIONS, inlineLimit: 1, markNumbers: false});
-    assertEqual(shape(unnumbered), ['History', 'item 0', {'Older (2)': ['item 1', 'item 2']}]);
+    assertEqual(shape(unnumbered), ['History', 'item 0', {'2-3': ['item 1', 'item 2']}]);
 });
 
 test('menu: inline limit larger than history', () => {
@@ -124,7 +128,7 @@ test('menu: numbering continues from pinned items through history to folders', (
     const nodes = buildHistoryNodes({pinned, recent: history(5)}, {...OPTIONS, inlineLimit: 1, folderLimit: 2});
     assertEqual(shape(nodes), [
         'Pinned', '1. pin zero', '2. pin one',
-        'History', '3. item 0', {'4. Older (2)': ['1. item 1', '2. item 2']}, {'5. Older (2)': ['1. item 3', '2. item 4']},
+        'History', '3. item 0', {'4. 4-5': ['1. item 1', '2. item 2']}, {'5. 6-7': ['1. item 3', '2. item 4']},
     ]);
     const numbers = historyNumbers(nodes);
     assertEqual([...numbers.keys()], [1, 2, 3, 4, 5]);
@@ -148,17 +152,20 @@ test('menu: numbers in the main menu ignore snippets', () => {
         'snippet folders get no number');
 });
 
-test('number keys: digits, keypad and number-row position', () => {
-    assertEqual(digitForKey(0x31, 0), 1, '"1" keysym');
-    assertEqual(digitForKey(0x30, 0), 0);
-    assertEqual(digitForKey(0xffb7, 0), 7, 'keypad 7');
-    assertEqual(digitForKey(0x1b1, 10), 1, 'Lithuanian ą on the 1 key');
-    assertEqual(digitForKey(0x1b9, 18), 9);
-    assertEqual(digitForKey(0xe0, 19), 0, 'French à on the 0 key');
-    assertEqual(digitForKey(0x61, 38), null, 'letter a');
-    assertEqual(numberForDigit(0, false), 10);
-    assertEqual(numberForDigit(0, true), 0);
-    assertEqual(numberForDigit(3, false), 3);
+test('number keys: digits, letters, keypad and key position', () => {
+    assertEqual(numberForKey(0x31, 0, false), 1, '"1" keysym');
+    assertEqual(numberForKey(0x30, 0, false), 10, '0 is the tenth');
+    assertEqual(numberForKey(0x30, 0, true), 0, '0 is the first when numbering from 0');
+    assertEqual(numberForKey(0xffb7, 0, false), 7, 'keypad 7');
+    assertEqual(numberForKey(0x1b1, 10, false), 1, 'Lithuanian ą on the 1 key');
+    assertEqual(numberForKey(0x1b9, 18, false), 9);
+    assertEqual(numberForKey(0xe0, 19, false), 10, 'French à on the 0 key');
+    assertEqual(numberForKey(0x61, 38, false), 11, 'letter a is entry A');
+    assertEqual(numberForKey(0x61, 38, true), 10, 'A is the tenth when numbering from 0');
+    assertEqual(numberForKey(0x42, 56, false), 12, 'Shift+B');
+    assertEqual(numberForKey(0x7a, 52, false), 36, 'z');
+    assertEqual(numberForKey(0x6c4, 38, false), 11, 'Cyrillic ф on the A key');
+    assertEqual(numberForKey(0x2c, 59, false), null, 'comma');
 });
 
 test('menu: pinned items know whether they can move', () => {

@@ -65,8 +65,8 @@ function generalPage(settings) {
     const paste = new Adw.PreferencesGroup({title: 'Paste'});
     paste.add(switchRow(settings, 'paste-automatically', 'Paste after selecting an item',
         'Otherwise the item is only copied to the clipboard'));
-    paste.add(switchRow(settings, 'number-keys', 'Paste by number key',
-        'In an open menu, 1–9 paste items 1–9 and 0 pastes item 10'));
+    paste.add(switchRow(settings, 'number-keys', 'Paste by number or letter key',
+        'In an open menu, 1–9, 0 and A–Z paste the entry with that label or open that folder'));
     paste.add(choiceRow(settings, 'delete-modifier', 'Delete item when selected with', MODIFIER_LABELS, 'string'));
     paste.add(choiceRow(settings, 'paste-delete-modifier', 'Paste and delete when selected with', MODIFIER_LABELS, 'string'));
     page.add(paste);

@@ -132,7 +132,7 @@ export default class SmokeExtension extends Extension {
         settings.set_int('inline-limit', 0);
         await wait(100);
         const folderLabels = labels(gclipy._indicator.menu);
-        check('inline-limit=0 re-renders with a numbered folder', folderLabels.includes('1. Older (2)') && !folderLabels.includes('1. smoke two'), JSON.stringify(folderLabels));
+        check('inline-limit=0 re-renders with a numbered folder', folderLabels.includes('1. 1-2') && !folderLabels.includes('1. smoke two'), JSON.stringify(folderLabels));
         settings.reset('inline-limit');
 
         gclipy._popUp('history');
@@ -284,7 +284,7 @@ export default class SmokeExtension extends Extension {
         settings.set_int('inline-limit', 0);
         gclipy._popUp('history');
         await wait(300);
-        const folder = menu()._getMenuItems().find(item => item.menu?.isOpen !== undefined && item.label?.text.includes('. Older ('));
+        const folder = menu()._getMenuItems().find(item => item.menu?.isOpen !== undefined && /^\d+\. \d+-\d+$/.test(item.label?.text ?? ''));
         folder.setSubmenuShown(true);
         await wait(300);
         folder.menu._getMenuItems().find(item => item.label?.text.endsWith('pin me')).grab_key_focus();
@@ -449,7 +449,7 @@ export default class SmokeExtension extends Extension {
         settings.set_int('folder-limit', 2);
 
         await open();
-        const first = folder('4. Older (2)');
+        const first = folder('4. 4-5');
         check('side submenu: focus starts on the first folder', focused() === first);
         check('a folder selected with the keyboard shows its contents and keeps focus',
             first.isSubmenuOpen && focused() === first);
@@ -477,16 +477,16 @@ export default class SmokeExtension extends Extension {
 
         await tap(Clutter.KEY_Down);
         check('Down moves to the next folder, closing the first and showing the next',
-            focused() === folder('5. Older (2)') && !first.isSubmenuOpen && folder('5. Older (2)').isSubmenuOpen,
+            focused() === folder('5. 6-7') && !first.isSubmenuOpen && folder('5. 6-7').isSubmenuOpen,
             focused()?.label?.text);
         await tap(Clutter.KEY_Return);
-        check('Enter enters a folder', folder('5. Older (2)').isSubmenuOpen && focused()?.label?.text === '1. t1');
+        check('Enter enters a folder', folder('5. 6-7').isSubmenuOpen && focused()?.label?.text === '1. t1');
         await tap(Clutter.KEY_Return);
         check('Enter on an item inside pastes it and closes the menu', !menu.isOpen && await clipboardText() === 't1');
 
         // Number keys: a folder's number steps into it, then digits count from 1 inside it.
         await open();
-        const fifth = folder('5. Older (2)');
+        const fifth = folder('5. 6-7');
         const secondInside = fifth.menu._getMenuItems()[1].label.text;
         await tap(Clutter.KEY_5);
         check('a folder number enters the folder, focused on its item 1', menu.isOpen && fifth.hasFocusInside &&
@@ -502,13 +502,13 @@ export default class SmokeExtension extends Extension {
 
         // Mouse: hover opens, moving to another folder switches, clicking an item pastes.
         await open();
-        const second = folder('6. Older (1)');
-        await pointAt(folder('4. Older (2)'), 400);
-        check('hovering a folder opens it', folder('4. Older (2)').isSubmenuOpen);
-        await pointAt(folder('4. Older (2)').menu._getMenuItems()[1], 400);
-        check('moving into the side panel keeps it open', folder('4. Older (2)').isSubmenuOpen);
+        const second = folder('6. 8-8');
+        await pointAt(folder('4. 4-5'), 400);
+        check('hovering a folder opens it', folder('4. 4-5').isSubmenuOpen);
+        await pointAt(folder('4. 4-5').menu._getMenuItems()[1], 400);
+        check('moving into the side panel keeps it open', folder('4. 4-5').isSubmenuOpen);
         await pointAt(second, 500);
-        check('hovering another folder switches to it', second.isSubmenuOpen && !folder('4. Older (2)').isSubmenuOpen);
+        check('hovering another folder switches to it', second.isSubmenuOpen && !folder('4. 4-5').isSubmenuOpen);
         const screenshot = GLib.getenv('SMOKE_SUBMENU_SCREENSHOT');
         if (screenshot)
             await saveScreenshot(screenshot);
@@ -516,12 +516,12 @@ export default class SmokeExtension extends Extension {
         check('clicking an item in the side panel pastes it', !menu.isOpen && await clipboardText() === 's1');
 
         await open();
-        await click(folder('4. Older (2)'));
+        await click(folder('4. 4-5'));
         check('clicking a folder enters it without closing the menu', menu.isOpen &&
-            folder('4. Older (2)').isSubmenuOpen && folder('4. Older (2)')._panel.contains(focused()));
+            folder('4. 4-5').isSubmenuOpen && folder('4. 4-5')._panel.contains(focused()));
         menu.close();
         await wait(200);
-        check('closing the menu closes its side panel', !folder('4. Older (2)')?.isSubmenuOpen);
+        check('closing the menu closes its side panel', !folder('4. 4-5')?.isSubmenuOpen);
 
         settings.reset('inline-limit');
         settings.reset('folder-limit');
@@ -556,7 +556,7 @@ export default class SmokeExtension extends Extension {
         settings.reset('snippets-above-history');
 
         settings.set_int('inline-limit', 0);
-        check('first History item in a folder: focus the folder', await openAndRead('history') === '4. Older (2)');
+        check('first History item in a folder: focus the folder', await openAndRead('history') === '4. 4-5');
         settings.reset('inline-limit');
 
         check('snippets menu starts on its first item', await openAndRead('snippets') === 'Examples');
@@ -821,6 +821,31 @@ export default class SmokeExtension extends Extension {
             `keysyms seen: ${seen.map(k => k.toString(16))}`);
         inputSources.reset('sources');
         await wait(500);
+
+        // Entry 10 is labelled 0, as on the keyboard; past it come A, B…, and their keys paste them.
+        for (let i = 1; i <= 9; i++) {
+            clipboard.set_text(St.ClipboardType.CLIPBOARD, `letter ${i}`);
+            await wait(250);
+        }
+        settings.set_int('inline-limit', 20);
+        gclipy._popUp('history');
+        await wait(200);
+        const entry0 = labels(menu).find(label => label.startsWith('0. '));
+        const entryA = labels(menu).find(label => label.startsWith('A. '));
+        check('entry 10 is labelled 0 and entry 11 A', !!entry0 && !!entryA &&
+            labels(menu).indexOf(entryA) === labels(menu).indexOf(entry0) + 1, JSON.stringify(labels(menu)));
+        tapKeyval(Clutter.KEY_0);
+        await wait(400);
+        check('pressing 0 pastes entry 10', !menu.isOpen && entry0?.endsWith(await clipboardText()),
+            `${entry0} ${await clipboardText()}`);
+        gclipy._popUp('history');
+        await wait(200);
+        const entryAAgain = labels(menu).find(label => label.startsWith('A. '));
+        tapKeyval(Clutter.KEY_a);
+        await wait(400);
+        check('pressing A pastes entry A', !menu.isOpen && entryAAgain?.endsWith(await clipboardText()),
+            `${entryAAgain} ${await clipboardText()}`);
+        settings.reset('inline-limit');
 
         keyboard.run_dispose();
     }

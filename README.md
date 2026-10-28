@@ -24,8 +24,9 @@ the same extension API, but those versions are untested.
 - Snippet folders, read from `~/.local/share/gclipy/snippets.json`.
 - Clipy's menu layout:
   - numbered entries, counting continuously from pinned items through history;
-    older history is grouped into folders ("8. Older (10)") that count as one
-    entry each, with the items inside numbered again from 1
+    older history is grouped into folders ("8. 8-17") that count as one
+    entry each and are titled with the positions they hold in the whole list;
+    the items inside are numbered again from 1
   - the 5 most recent items shown directly in the menu (configurable)
   - in the main menu: Pinned, then Snippet, then History (snippets can be moved
     after History in settings)
@@ -39,12 +40,13 @@ the same extension API, but those versions are untested.
   Click the pin again to unpin, or delete the item with the delete modifier.
   Rearrange pinned items with Ctrl+Up / Ctrl+Down on the highlighted item, or
   turn on ▲/▼ buttons under Settings → Menu → "Show ▲/▼ buttons on pinned items".
-- Number keys: while a menu is open, press 1–9 to paste entry 1–9, or 0 for
-  entry 10. A folder's number steps into the folder, and the next digit pastes
-  from inside it: "8" then "1" pastes the first item of folder 8. Left goes
-  back to the top level. The keypad works with NumLock on. On
-  layouts whose number row types letters (Lithuanian, French…) the keys still
-  work by position. You can turn this off under Settings → General → Paste.
+- Shortcut keys: entries are labelled in keyboard order, 1–9 and 0 for the
+  tenth, then A–Z, and while a menu is open pressing an entry's label pastes
+  it. A folder's key steps into the folder, and the next key pastes from inside
+  it: "8" then "1" pastes the first item of folder 8, "8" then "0" its tenth. Left goes back to the top level. The keypad
+  works with NumLock on. On layouts whose number row types letters
+  (Lithuanian, French…) or whose letters are not Latin (Russian, Greek…) the
+  keys work by position. You can turn this off under Settings → General → Paste.
 - Selecting an item copies it and pastes it into the focused window. Terminals
   get Ctrl+Shift+V and everything else gets Ctrl+V.
 - Press Delete on a highlighted history item (pinned or not) to remove it; the

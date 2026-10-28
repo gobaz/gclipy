@@ -11,7 +11,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {HistoryStore, itemsFromJSON} from './lib/historyStore.js';
 import {ImageStore} from './lib/images.js';
 import {buildHistoryNodes, buildMainMenu, buildSnippetNodes, historyNumbers, historyOrder} from './lib/menuModel.js';
-import {digitForKey, numberForDigit} from './lib/numberKeys.js';
+import {numberForKey} from './lib/numberKeys.js';
 import {historyAction, matchesApp} from './lib/paste.js';
 import {EXAMPLE_SNIPPETS, parseSnippets} from './lib/snippetStore.js';
 import {defaultDataDir, JsonFile} from './lib/storage.js';
@@ -543,25 +543,26 @@ export default class GclipyExtension extends Extension {
         if (!this._settings.get_boolean('number-keys'))
             return Clutter.EVENT_PROPAGATE;
         // Leave Ctrl, Alt and Super combinations to other shortcuts such as Ctrl+P. Shift is allowed
-        // because some layouts (e.g. French) need it to type digits.
+        // because some layouts (e.g. French) need it to type digits, and letters work in either case.
         const blocked = Clutter.ModifierType.CONTROL_MASK | Clutter.ModifierType.MOD1_MASK |
             Clutter.ModifierType.SUPER_MASK | Clutter.ModifierType.MOD4_MASK;
         if (event.get_state() & blocked)
             return Clutter.EVENT_PROPAGATE;
-        const digit = digitForKey(event.get_key_symbol(), event.get_key_code());
+        const number = numberForKey(event.get_key_symbol(), event.get_key_code(),
+            this._settings.get_boolean('start-at-zero'));
         const numbers = this._menuNumbers.get(menu);
-        if (digit === null || !numbers)
+        if (number === null || !numbers)
             return Clutter.EVENT_PROPAGATE;
-        // Digits pick from the folder the focus is in, otherwise from the top level.
+        // Keys pick from the folder the focus is in, otherwise from the top level.
         const items = this._menuItems.get(menu);
         const folderOf = entry => items?.get(entry.values().next().value)?.folder ?? null;
         const level = [...numbers.values()].find(entry => typeof entry !== 'string' && folderOf(entry)?.hasFocusInside) ??
             numbers;
-        const entry = level.get(numberForDigit(digit, this._settings.get_boolean('start-at-zero')));
+        const entry = level.get(number);
         if (!entry)
             return Clutter.EVENT_PROPAGATE;
         if (typeof entry !== 'string') {
-            // A folder: step into it, so the next digit picks one of its items.
+            // A folder: step into it, so the next key picks one of its items.
             const folder = folderOf(entry);
             folder?.grab_key_focus();
             folder?.enter();
@@ -569,7 +570,7 @@ export default class GclipyExtension extends Extension {
         }
         const id = entry;
         menu.itemActivated();
-        // No modifiers: a Shift needed to type the digit must not trigger the delete modifier.
+        // No modifiers: a Shift needed to type the key must not trigger the delete modifier.
         this._onHistorySelected(id, new Set());
         return Clutter.EVENT_STOP;
     }

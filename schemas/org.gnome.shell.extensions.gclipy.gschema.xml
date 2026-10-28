@@ -132,8 +132,8 @@
     </key>
     <key name="number-keys" type="b">
       <default>true</default>
-      <summary>Paste history items by pressing their number</summary>
-      <description>While a gclipy menu is open, 1-9 paste items 1-9 and 0 pastes item 10 (0-9 when numbering starts at 0).</description>
+      <summary>Paste history items by pressing their label</summary>
+      <description>While a gclipy menu is open, the keys 1-9, 0 (the tenth) and A-Z (0-9 then A-Z when numbering starts at 0) paste the entry with that label, or step into the folder with that label.</description>
     </key>
     <key name="delete-modifier" type="s">
       <choices>
