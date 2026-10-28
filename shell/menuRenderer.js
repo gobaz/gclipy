@@ -14,6 +14,7 @@ import {SideSubmenuItem} from './sideSubmenu.js';
  * @property {(id: string, pinned: boolean) => void} onPin
  * @property {(id: string, offset: number) => void} onMovePinned
  * @property {(id: string) => void} onDelete
+ * @property {(id: string) => void} onEdit
  * @property {(id: string) => void} onSnippet
  * @property {(action: string) => void} onAction
  */
@@ -122,7 +123,7 @@ function addKindIcon(item, node) {
  * A pin toggle at the end of a history item, also reachable with Ctrl+P on the focused item.
  * The icon flips at once; the owner then rebuilds the menu to move the item.
  */
-function addItemControls(item, node, {onPin, onMovePinned, onDelete}, showMoveButtons) {
+function addItemControls(item, node, {onPin, onMovePinned, onDelete, onEdit}, showMoveButtons) {
     if (node.pinned && showMoveButtons) {
         item.add_child(iconButton('go-up-symbolic', 'Move up', node.canMoveUp, () => onMovePinned(node.id, -1)));
         item.add_child(iconButton('go-down-symbolic', 'Move down', node.canMoveDown, () => onMovePinned(node.id, 1)));
@@ -142,7 +143,7 @@ function addItemControls(item, node, {onPin, onMovePinned, onDelete}, showMoveBu
     update();
     item.add_child(pinButton);
 
-    // Delete removes the item; Ctrl+P pins or unpins; Ctrl+Up/Down rearrange pinned items.
+    // Delete removes the item; Ctrl+P pins or unpins; Ctrl+E edits text; Ctrl+Up/Down rearrange pinned items.
     // Stopping the event also keeps the item's own arrow-key navigation from running.
     item.connect('key-press-event', (_item, event) => {
         const key = event.get_key_symbol();
@@ -154,6 +155,8 @@ function addItemControls(item, node, {onPin, onMovePinned, onDelete}, showMoveBu
             return Clutter.EVENT_PROPAGATE;
         if (key === Clutter.KEY_p || key === Clutter.KEY_P)
             toggle();
+        else if ((key === Clutter.KEY_e || key === Clutter.KEY_E) && !node.image)
+            onEdit(node.id);
         else if (node.pinned && (key === Clutter.KEY_Up || key === Clutter.KEY_Down))
             onMovePinned(node.id, key === Clutter.KEY_Up ? -1 : 1);
         else

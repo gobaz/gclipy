@@ -221,6 +221,7 @@ export default class SmokeExtension extends Extension {
         await this._testStartFocus(gclipy, settings);
         await this._testSideSubmenus(gclipy, settings);
         await this._testDeleteKey(gclipy, settings);
+        await this._testEdit(gclipy);
 
         gclipy.openPreferences();
         await wait(3000);
@@ -350,6 +351,62 @@ export default class SmokeExtension extends Extension {
         pointer.run_dispose();
         keyboard.run_dispose();
         return gclipy;
+    }
+
+    async _testEdit(gclipy) {
+        const clipboard = St.Clipboard.get_default();
+        const keyboard = Clutter.get_default_backend().get_default_seat()
+            .create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        const time = () => GLib.get_monotonic_time();
+        const press = async (keyval, ctrl = false) => {
+            if (ctrl)
+                keyboard.notify_keyval(time(), Clutter.KEY_Control_L, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time(), keyval, Clutter.KeyState.PRESSED);
+            keyboard.notify_keyval(time(), keyval, Clutter.KeyState.RELEASED);
+            if (ctrl)
+                keyboard.notify_keyval(time(), Clutter.KEY_Control_L, Clutter.KeyState.RELEASED);
+            await wait(150);
+        };
+        const menu = gclipy._pointerMenu.menu;
+        const itemFor = text => menu._getMenuItems().find(item => item.label?.text.endsWith(` ${text}`));
+        // Items in overwrite mode (the default) get a new id when edited, so look them up by text.
+        const idOf = text => gclipy._history.sorted(false).find(item => item.text === text)?.id;
+
+        clipboard.set_text(St.ClipboardType.CLIPBOARD, 'edit me');
+        await wait(300);
+        const before = gclipy._history.unpinned(false).map(item => item.text);
+        const position = before.indexOf('edit me');
+
+        gclipy._popUp('history');
+        await wait(300);
+        itemFor('edit me').grab_key_focus();
+        await press(Clutter.KEY_e, true);
+        await wait(300);
+        const dialog = gclipy._dialog;
+        check('Ctrl+E opens the editor and closes the menu', !menu.isOpen && !!dialog?.entry &&
+            dialog.entry.text === 'edit me' && global.stage.get_key_focus() === dialog.entry.clutter_text);
+        // Enter adds a line rather than saving; the cursor starts at the end.
+        await press(Clutter.KEY_Return);
+        await press(Clutter.KEY_x);
+        check('Enter inserts a new line in the editor', dialog.entry.text === 'edit me\nx' && !!gclipy._dialog,
+            JSON.stringify(dialog.entry.text));
+        await press(Clutter.KEY_Return, true);
+        await wait(400);
+        const after = gclipy._history.unpinned(false).map(item => item.text);
+        check('Ctrl+Enter saves the edit in place', after[position] === 'edit me\nx' && !gclipy._dialog &&
+            after.length === before.length && !idOf('edit me'), JSON.stringify(after));
+        check('the edit is not copied or pasted', await clipboardText() === 'edit me');
+
+        gclipy._popUp('history');
+        await wait(300);
+        itemFor('edit me').grab_key_focus();
+        await press(Clutter.KEY_e, true);
+        await wait(300);
+        await press(Clutter.KEY_y);
+        await press(Clutter.KEY_Escape);
+        await wait(400);
+        check('Escape cancels the edit', !!idOf('edit me\nx') && !idOf('edit me\nxy') && !gclipy._dialog);
+        keyboard.run_dispose();
     }
 
     async _testDeleteKey(gclipy, settings) {

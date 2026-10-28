@@ -17,6 +17,7 @@ import {EXAMPLE_SNIPPETS, parseSnippets} from './lib/snippetStore.js';
 import {defaultDataDir, JsonFile} from './lib/storage.js';
 import {ClipboardMonitor} from './shell/clipboardMonitor.js';
 import {openClearHistoryDialog} from './shell/confirmDialog.js';
+import {openEditDialog} from './shell/editDialog.js';
 import {createIndicator} from './shell/indicator.js';
 import {Keybindings} from './shell/keybindings.js';
 import {pressedModifiers, renderMenu} from './shell/menuRenderer.js';
@@ -355,6 +356,21 @@ export default class GclipyExtension extends Extension {
         });
     }
 
+    /** Ctrl+E on a text item: edit its text in place, keeping its position and pin. */
+    _editItem(id) {
+        const item = this._history.get(id);
+        if (item?.kind !== 'text')
+            return;
+        this._dialog?.destroy();
+        this._dialog = openEditDialog(item.text, text => {
+            if (this._history.setText(id, text))
+                this._historyChanged();
+        });
+        this._dialog.connect('destroy', () => {
+            this._dialog = null;
+        });
+    }
+
     _clearHistory() {
         if (this._history.clear())
             this._historyChanged();
@@ -429,6 +445,10 @@ export default class GclipyExtension extends Extension {
                     this._historyChanged();
                     this._rebuildKeepingFocus(menu, kind, neighbour);
                 }
+            },
+            onEdit: id => {
+                menu.close();
+                this._editItem(id);
             },
             onSnippet: id => this._onSnippetSelected(id),
             onAction: action => this._onAction(action),

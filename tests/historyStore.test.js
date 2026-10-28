@@ -211,3 +211,32 @@ test('pins: move up and down', () => {
     const reloaded = new HistoryStore({items: itemsFromJSON(JSON.parse(JSON.stringify(store))), hash: t => t, newId: () => 'x'});
     assertEqual(reloaded.pinned().map(item => item.text).join(''), 'bca', 'order is saved');
 });
+
+test('history: setText edits a text item in place', () => {
+    const {store, tick} = makeStore();
+    const options = {...DEFAULTS, overwriteDuplicate: false};
+    store.addText('one', options);
+    tick();
+    store.addText('two', options);
+    const [newest, oldest] = store.sorted(false);
+    store.setPinned(oldest.id, true);
+    assertEqual(store.setText(oldest.id, 'one edited'), true);
+    const edited = store.get(oldest.id);
+    assertEqual([edited.text, edited.hash, edited.pinned], ['one edited', 'h:one edited', true]);
+    assertEqual(store.sorted(false)[0].id, newest.id, 'position unchanged');
+    assertEqual(store.setText(oldest.id, 'one edited'), false, 'unchanged text');
+    assertEqual(store.setText(oldest.id, '   '), false, 'blank text');
+    assertEqual(store.setText('missing', 'x'), false, 'unknown id');
+});
+
+test('history: setText gives overwrite-mode items a fresh id', () => {
+    const {store} = makeStore();
+    store.addText('one', DEFAULTS);
+    const [item] = store.sorted(false);
+    assertEqual(item.id, 'h:one');
+    store.setText(item.id, 'two');
+    const [edited] = store.sorted(false);
+    assertEqual(edited.text === 'two' && edited.id !== 'h:one', true);
+    store.addText('one', DEFAULTS);
+    assertEqual(new Set(store.sorted(false).map(i => i.id)).size, 2, 'ids stay unique');
+});

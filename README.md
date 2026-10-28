@@ -49,6 +49,9 @@ the same extension API, but those versions are untested.
   keys work by position. You can turn this off under Settings → General → Paste.
 - Selecting an item copies it and pastes it into the focused window. Terminals
   get Ctrl+Shift+V and everything else gets Ctrl+V.
+- Press Ctrl+E on a highlighted text item to edit it in a small editor. Enter
+  starts a new line, Ctrl+Enter saves and Escape cancels. The item keeps its
+  place and pin; the clipboard is not changed.
 - Press Delete on a highlighted history item (pinned or not) to remove it; the
   menu stays open. Optional modifiers can also delete an item on selection, or
   paste it and then delete it.
