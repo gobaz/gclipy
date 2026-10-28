@@ -12,7 +12,11 @@ export class PointerMenu {
         this._anchor = new St.Widget({width: 1, height: 1, opacity: 0, reactive: false});
         Main.layoutManager.uiGroup.add_child(this._anchor);
 
-        this.menu = new PopupMenu.PopupMenu(this._anchor, 0.0, St.Side.TOP);
+        // Opening beside the pointer (arrow on the left) rather than below it lets BoxPointer slide
+        // the menu up when the pointer is low on the screen: on the left or right side it keeps the
+        // menu inside the work area vertically, while below the pointer it would only flip above,
+        // and only when the whole menu fits there, so a long menu could run off the bottom.
+        this.menu = new PopupMenu.PopupMenu(this._anchor, 0.0, St.Side.LEFT);
         Main.layoutManager.uiGroup.add_child(this.menu.actor);
         this.menu.actor.hide();
 

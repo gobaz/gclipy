@@ -222,6 +222,7 @@ export default class SmokeExtension extends Extension {
         await this._testSideSubmenus(gclipy, settings);
         await this._testDeleteKey(gclipy, settings);
         await this._testEdit(gclipy);
+        await this._testScreenEdges(gclipy, settings);
 
         gclipy.openPreferences();
         await wait(3000);
@@ -351,6 +352,59 @@ export default class SmokeExtension extends Extension {
         pointer.run_dispose();
         keyboard.run_dispose();
         return gclipy;
+    }
+
+    async _testScreenEdges(gclipy, settings) {
+        const clipboard = St.Clipboard.get_default();
+        const pointer = Clutter.get_default_backend().get_default_seat()
+            .create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        const menu = gclipy._pointerMenu.menu;
+        const workArea = Main.layoutManager.getWorkAreaForMonitor(Main.layoutManager.primaryIndex);
+        const inside = actor => {
+            const [x, y] = actor.get_transformed_position();
+            const [width, height] = actor.get_transformed_size();
+            return x >= workArea.x && y >= workArea.y &&
+                x + width <= workArea.x + workArea.width + 1 && y + height <= workArea.y + workArea.height + 1;
+        };
+        const describe = actor => `${actor.get_transformed_position()} ${actor.get_transformed_size()} in ` +
+            `${workArea.x},${workArea.y} ${workArea.width}x${workArea.height}`;
+
+        for (let i = 0; i < 12; i++) {
+            clipboard.set_text(St.ClipboardType.CLIPBOARD, `edge ${i}`);
+            await wait(150);
+        }
+        // A menu taller than the room both below and above the pointer.
+        settings.set_int('inline-limit', 12);
+        for (const [x, y] of [[300, workArea.y + workArea.height / 2], [300, workArea.y + workArea.height - 10],
+            [workArea.x + workArea.width - 10, workArea.y + workArea.height - 10]]) {
+            pointer.notify_absolute_motion(GLib.get_monotonic_time(), x, y);
+            await wait(100);
+            gclipy._popUp('history');
+            await wait(600);
+            check(`menu opened at ${Math.round(x)},${Math.round(y)} stays on screen`, menu.isOpen && inside(menu.actor),
+                describe(menu.actor));
+            menu.close();
+            await wait(300);
+        }
+        settings.reset('inline-limit');
+
+        // A folder near the bottom keeps its side panel on screen.
+        settings.set_int('inline-limit', 0);
+        settings.set_int('folder-limit', 12);
+        pointer.notify_absolute_motion(GLib.get_monotonic_time(), 300, workArea.y + workArea.height - 10);
+        await wait(100);
+        gclipy._popUp('history');
+        await wait(600);
+        const folder = menu._getMenuItems().find(item => item.panelMenu);
+        folder.grab_key_focus();
+        await wait(400);
+        check('a folder\'s side panel near the bottom stays on screen', folder.isSubmenuOpen &&
+            inside(folder.panelMenu.actor), describe(folder.panelMenu.actor));
+        menu.close();
+        await wait(300);
+        settings.reset('inline-limit');
+        settings.reset('folder-limit');
+        pointer.run_dispose();
     }
 
     async _testEdit(gclipy) {
