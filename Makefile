@@ -35,4 +35,4 @@ smoke:
 
 screenshot:
 	mkdir -p docs
-	SCREENSHOT_PATH=$(CURDIR)/docs/screenshot.png tests/smoke.sh screenshot
+	SCREENSHOT_DIR=$(CURDIR)/docs tests/smoke.sh screenshot

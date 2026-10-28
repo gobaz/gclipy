@@ -1,5 +1,7 @@
 // Fills gclipy with demo content inside a headless shell (tests/smoke.sh screenshot) and saves
-// a cropped screenshot of the open menu to $SCREENSHOT_PATH. Used for the README image.
+// cropped screenshots of the open menu into $SCREENSHOT_DIR. Used for the README images:
+// screenshot.png (main menu), image-preview.png (an image item's preview) and folder.png (an
+// open history folder).
 
 import Clutter from 'gi://Clutter';
 import GdkPixbuf from 'gi://GdkPixbuf';
@@ -91,9 +93,9 @@ export default class ScreenshotHelper extends Extension {
     }
 
     async _run() {
-        const path = GLib.getenv('SCREENSHOT_PATH');
-        if (!path)
-            throw new Error('SCREENSHOT_PATH is not set');
+        const dir = GLib.getenv('SCREENSHOT_DIR');
+        if (!dir)
+            throw new Error('SCREENSHOT_DIR is not set');
 
         // A plain background (this shell's settings are isolated) and no overview.
         const background = new Gio.Settings({schema_id: 'org.gnome.desktop.background'});
@@ -113,6 +115,10 @@ export default class ScreenshotHelper extends Extension {
             gclipy._historyChanged();
         };
 
+        // Oldest first: these end up in the "8-…" folder below the five recent items.
+        for (const text of ['TODO: update the changelog', 'npm run build', 'docker compose up -d',
+            'SELECT id, title FROM notes LIMIT 10;', 'Thanks, see you tomorrow!', 'https://gjs.guide/extensions/'])
+            await copy(text);
         await copy('https://github.com/gobaz/gclipy');
         pinNewest();
         await copy('git pull --rebase origin develop');
@@ -130,10 +136,38 @@ export default class ScreenshotHelper extends Extension {
         await wait(200);
         pointer.run_dispose();
 
+        const menu = gclipy._pointerMenu.menu;
+        const shoot = async (name, actors) => {
+            const path = GLib.build_filenamev([dir, name]);
+            await saveArea(path, areaAround([menu.actor, gclipy._preview.actor, ...actors]));
+            menu.close();
+            await wait(400);
+            console.log(`SMOKE ok screenshot saved to ${path}`);
+        };
+
+        // The main menu, focused on the newest item with its text previewed.
         gclipy._popUp('main');
         await wait(800);
-        await saveArea(path, areaAround([gclipy._pointerMenu.menu.actor, gclipy._preview.actor]));
-        gclipy._pointerMenu.menu.close();
-        console.log(`SMOKE ok screenshot saved to ${path}`);
+        await shoot('screenshot.png', []);
+
+        // The image item highlighted, its picture in the preview panel.
+        gclipy._popUp('history');
+        await wait(800);
+        const items = gclipy._menuItems.get(menu);
+        const image = gclipy._history.unpinned(false).find(item => item.kind === 'image');
+        items.get(image.id).item.grab_key_focus();
+        await wait(500);
+        await shoot('image-preview.png', []);
+
+        // The older-items folder open beside the menu, its second item previewed.
+        gclipy._popUp('history');
+        await wait(800);
+        const folder = [...gclipy._menuItems.get(menu).values()].find(entry => entry.folder)?.folder;
+        folder.grab_key_focus();
+        folder.enter();
+        await wait(300);
+        folder.menu._getMenuItems()[1].grab_key_focus();
+        await wait(500);
+        await shoot('folder.png', [folder.panelMenu.actor]);
     }
 }

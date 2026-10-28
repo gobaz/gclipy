@@ -5,63 +5,64 @@ Clipboard history and snippet menus for GNOME Shell, inspired by the macOS app
 because only code inside the shell can watch the clipboard, register global
 shortcuts and paste into other windows on Wayland.
 
-![The gclipy menu: pinned items, numbered history with an image thumbnail, a preview of the highlighted item, and snippets](docs/screenshot.png)
+![The main menu: pinned items, a snippet folder, numbered history with text and image icons, and a preview of the highlighted text](docs/screenshot.png)
 
 Tested on GNOME Shell 46. `metadata.json` also lists 45, 47 and 48, which share
 the same extension API, but those versions are untested.
 
 ## Features
 
-- Clipboard history of text and images, newest first, with Clipy's duplicate
-  handling (record or ignore duplicates, move a re-copied item to the top).
-- History items start with a text or image icon (Settings → Menu → "Show
-  icons"; without icons, images are titled "(Image)").
-- Images (screenshots, "Copy Image" in browsers, image editors) are listed with
-  their size (W×H) and a thumbnail, previewed larger (up to 320×240) in
-  the side panel when highlighted, and are pasted back as PNG. When a copy offers
-  both text and an image, as spreadsheets and office apps do, the text is
-  recorded.
-- Snippet folders, read from `~/.local/share/gclipy/snippets.json`.
-- Clipy's menu layout:
-  - numbered entries, counting continuously from pinned items through history;
-    older history is grouped into folders ("8. 8-17") that count as one
-    entry each and are titled with the positions they hold in the whole list;
-    the items inside are numbered again from 1
+- **History** of text and images, newest first, with Clipy's duplicate handling
+  (record or ignore duplicates, move a re-copied item to the top). Items start
+  with a text or image icon; without icons (Settings → Menu → "Show icons")
+  images are titled "(Image)".
+- **Images** (screenshots, "Copy Image" in browsers, image editors) are listed
+  with their size and a thumbnail, previewed up to 320×240 when highlighted,
+  and pasted back as PNG. When a copy offers both text and an image, as
+  spreadsheets and office apps do, the text is recorded.
+- **Preview**: the highlighted item's text (a configurable number of lines) or
+  image appears in a panel beside the menu.
+- **Menu layout**, after Clipy:
+  - pinned items first, then snippets, then history (snippets can move after
+    History in settings)
   - the 5 most recent items shown directly in the menu (configurable)
-  - in the main menu: Pinned, then Snippet, then History (snippets can be moved
-    after History in settings)
-  - folders (history ranges and snippet folders) show their contents beside
-    the menu as soon as they are selected with the keyboard (or hovered);
-    Right, Enter or a click moves into them, Left goes back. When the panel
-    opens on the left near the screen edge, the arrows swap.
-- Pinned items: click the pin icon on a history item, or press Ctrl+P while it
-  is highlighted, to keep it in a "Pinned" section above History. Pins are
-  never removed by Clear History, periodic clearing or the history size limit.
-  Click the pin again to unpin, or delete the item with the delete modifier.
-  Rearrange pinned items with Ctrl+Up / Ctrl+Down on the highlighted item, or
-  turn on ▲/▼ buttons under Settings → Menu → "Show ▲/▼ buttons on pinned items".
-- Shortcut keys: entries are labelled in keyboard order, 1–9 and 0 for the
-  tenth, then A–Z, and while a menu is open pressing an entry's label pastes
-  it. A folder's key steps into the folder, and the next key pastes from inside
-  it: "8" then "1" pastes the first item of folder 8, "8" then "0" its tenth. Left goes back to the top level. The keypad
-  works with NumLock on. On layouts whose number row types letters
-  (Lithuanian, French…) or whose letters are not Latin (Russian, Greek…) the
-  keys work by position. You can turn this off under Settings → General → Paste.
-- Selecting an item copies it and pastes it into the focused window. Terminals
-  get Ctrl+Shift+V and everything else gets Ctrl+V.
-- Press Ctrl+E on a highlighted text item to edit it in a small editor. Enter
-  starts a new line, Ctrl+Enter saves and Escape cancels. The item keeps its
+  - older history grouped into folders that open beside the menu as soon as
+    they are selected or hovered; a folder's title gives the positions of its
+    items in the whole list ("8. 8-17")
+- **Labels and shortcut keys**: entries are labelled in keyboard order, 1–9,
+  then 0 for the tenth, then A–Z, counting continuously from pinned items
+  through history. A folder counts as one entry, and its items are labelled
+  from 1 again. Press a label to paste that entry; a folder's label steps into
+  it, so "8" then "1" pastes the first item of folder 8.
+- **Pinned items** stay in a "Pinned" section and survive Clear History,
+  periodic clearing and the history size limit. Pin with the pin icon or
+  Ctrl+P, and rearrange with Ctrl+Up / Ctrl+Down (or optional ▲/▼ buttons,
+  Settings → Menu).
+- **Editing**: Ctrl+E opens a small editor for a text item. The item keeps its
   place and pin; the clipboard is not changed.
-- Press Delete on a highlighted history item (pinned or not) to remove it; the
-  menu stays open. Optional modifiers can also delete an item on selection, or
-  paste it and then delete it.
-- Excluded applications, and skipping of content that password managers mark
-  as secret (`x-kde-passwordManagerHint`).
-- Clearing history manually (with confirmation), periodically, or when the
+- **Pasting**: selecting an item copies it and pastes it into the focused
+  window. Terminals get Ctrl+Shift+V and everything else gets Ctrl+V. Optional
+  modifiers delete an item on selection, or paste it and then delete it.
+- **Snippet folders**, edited as JSON in your text editor (see below). Pasted
+  snippets are not added to history.
+- **Privacy**: excluded applications, and skipping of content that password
+  managers mark as secret (`x-kde-passwordManagerHint`).
+- **Clearing** history manually (with confirmation), periodically, or when the
   extension is disabled.
 
 Not in this version: a graphical snippet editor, and importing Clipy snippet
 exports.
+
+## Screenshots
+
+An image item highlighted: the picture is shown in the preview panel.
+
+![The history menu with an image item highlighted and the picture shown in the preview panel](docs/image-preview.png)
+
+An older-items folder open beside the menu. Its items are labelled from 1, so
+"8" then "2" pastes the highlighted one.
+
+![A folder of older items open beside the menu, its items numbered from 1, with the highlighted item previewed](docs/folder.png)
 
 ## Shortcuts
 
@@ -75,6 +76,24 @@ Clipy's ⌘ maps to Super:
 | Settings | Ctrl+Alt+Shift+Super+V |
 
 Change them on the **Shortcuts** page in settings.
+
+Inside an open menu:
+
+| Key | Action |
+| --- | --- |
+| Up / Down | Move between entries |
+| Enter, click | Paste the item, or step into a folder |
+| Right / Left | Step into / back out of a folder (swapped when it opens on the left) |
+| 1–9, 0, A–Z | Paste the entry with that label, or step into that folder |
+| Ctrl+P | Pin or unpin the item |
+| Ctrl+Up / Ctrl+Down | Move a pinned item |
+| Ctrl+E | Edit a text item (Enter: new line, Ctrl+Enter: save, Escape: cancel) |
+| Delete | Remove the item; the menu stays open |
+| Escape | Close the menu |
+
+The keypad works with NumLock on. On layouts whose number row types letters
+(Lithuanian, French…) or whose letters are not Latin (Russian, Greek…), the
+label keys work by position. Turn them off under Settings → General → Paste.
 
 ## Install
 
@@ -166,7 +185,8 @@ tests/    unit tests for lib/, plus a headless shell smoke test
     prefs window open, and `SMOKE_MENU_SCREENSHOT=/path.png` one of the history
     menu with image thumbnails.
   - `KEEP_LOG=1` keeps the shell log.
-- `make screenshot` regenerates `docs/screenshot.png` in the same headless shell, using the demo
+- `make screenshot` regenerates the README images in `docs/` (`screenshot.png`,
+  `image-preview.png`, `folder.png`) in the same headless shell, using the demo
   content in `tests/screenshot/extension.js`.
 - Watch logs from the real session with `journalctl -f /usr/bin/gnome-shell`.
 
