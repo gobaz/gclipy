@@ -10,7 +10,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {HistoryStore, itemsFromJSON} from './lib/historyStore.js';
 import {ImageStore} from './lib/images.js';
-import {buildHistoryNodes, buildMainMenu, buildSnippetNodes, historyNumbers} from './lib/menuModel.js';
+import {buildHistoryNodes, buildMainMenu, buildSnippetNodes, historyNumbers, historyOrder} from './lib/menuModel.js';
 import {digitForKey, numberForDigit} from './lib/numberKeys.js';
 import {historyAction, matchesApp} from './lib/paste.js';
 import {EXAMPLE_SNIPPETS, parseSnippets} from './lib/snippetStore.js';
@@ -62,10 +62,12 @@ export default class GclipyExtension extends Extension {
             recordImages: () => this._settings.get_boolean('record-images'),
         });
         this._paster = new Paster();
-        // Number to history item id for each rendered menu, used by the number keys.
+        // Number to history item id (or folder) for each rendered menu, used by the number keys.
         this._menuNumbers = new Map();
         // Where keyboard focus goes when each menu opens: its first History item.
         this._menuStart = new Map();
+        // Rendered history items of each menu, by id, with the folder holding each one.
+        this._menuItems = new Map();
         // Shell menus have no tooltips; this panel beside the open menu stands in for them.
         this._preview = new PreviewPanel();
         // PointerMenu registers with its menu manager first, so the manager's modal grab runs
@@ -133,6 +135,7 @@ export default class GclipyExtension extends Extension {
         this._snippetsFile = null;
         this._menuNumbers = null;
         this._menuStart = null;
+        this._menuItems = null;
         this._images = null;
         this._imageCancellable = null;
         this._imageCleanupId = 0;
@@ -419,9 +422,9 @@ export default class GclipyExtension extends Extension {
             },
             onDelete: id => {
                 // Focus moves to the item below, or above when the last one goes.
-                const numbers = [...this._menuNumbers.get(menu)];
-                const index = numbers.findIndex(([, itemId]) => itemId === id);
-                const neighbour = (numbers[index + 1] ?? numbers[index - 1])?.[1];
+                const order = historyOrder(this._menuNumbers.get(menu));
+                const index = order.indexOf(id);
+                const neighbour = order[index + 1] ?? order[index - 1];
                 if (this._history.delete(id)) {
                     this._historyChanged();
                     this._rebuildKeepingFocus(menu, kind, neighbour);
@@ -444,6 +447,7 @@ export default class GclipyExtension extends Extension {
         });
         const firstRecent = kind === 'snippets' ? null : history.recent[0];
         this._menuStart.set(menu, firstRecent ? items.get(firstRecent.id) ?? null : null);
+        this._menuItems.set(menu, items);
         return items;
     }
 
@@ -506,6 +510,7 @@ export default class GclipyExtension extends Extension {
             this._watchMenu(this._indicator.menu);
         } else if (!show && this._indicator) {
             this._menuNumbers.delete(this._indicator.menu);
+            this._menuItems.delete(this._indicator.menu);
             this._menuStart.delete(this._indicator.menu);
             this._indicator.destroy();
             this._indicator = null;
@@ -544,10 +549,25 @@ export default class GclipyExtension extends Extension {
         if (event.get_state() & blocked)
             return Clutter.EVENT_PROPAGATE;
         const digit = digitForKey(event.get_key_symbol(), event.get_key_code());
-        const id = digit === null ? null
-            : this._menuNumbers.get(menu)?.get(numberForDigit(digit, this._settings.get_boolean('start-at-zero')));
-        if (!id)
+        const numbers = this._menuNumbers.get(menu);
+        if (digit === null || !numbers)
             return Clutter.EVENT_PROPAGATE;
+        // Digits pick from the folder the focus is in, otherwise from the top level.
+        const items = this._menuItems.get(menu);
+        const folderOf = entry => items?.get(entry.values().next().value)?.folder ?? null;
+        const level = [...numbers.values()].find(entry => typeof entry !== 'string' && folderOf(entry)?.hasFocusInside) ??
+            numbers;
+        const entry = level.get(numberForDigit(digit, this._settings.get_boolean('start-at-zero')));
+        if (!entry)
+            return Clutter.EVENT_PROPAGATE;
+        if (typeof entry !== 'string') {
+            // A folder: step into it, so the next digit picks one of its items.
+            const folder = folderOf(entry);
+            folder?.grab_key_focus();
+            folder?.enter();
+            return Clutter.EVENT_STOP;
+        }
+        const id = entry;
         menu.itemActivated();
         // No modifiers: a Shift needed to type the digit must not trigger the delete modifier.
         this._onHistorySelected(id, new Set());

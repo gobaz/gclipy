@@ -1,4 +1,4 @@
-import {buildHistoryNodes, buildMainMenu, buildSnippetNodes, historyNumbers} from '../lib/menuModel.js';
+import {buildHistoryNodes, buildMainMenu, buildSnippetNodes, historyNumbers, historyOrder} from '../lib/menuModel.js';
 import {digitForKey, numberForDigit} from '../lib/numberKeys.js';
 import {numberedTitle, previewText, trimmedMenuTitle} from '../lib/titles.js';
 import {assertEqual, test} from './harness.js';
@@ -45,24 +45,26 @@ test('titles: preview counts lines', () => {
     assertEqual(previewText('x'.repeat(500), 8).length, 301, 'a 500-character line is not split into lines');
 });
 
-test('menu: all history in range submenus by default', () => {
+test('menu: all history in numbered folders by default, numbered from 1 inside', () => {
     assertEqual(shape(buildHistoryNodes(recent(history(12)), OPTIONS)), [
         'History',
-        {'1 - 10': ['1. item 0', '2. item 1', '3. item 2', '4. item 3', '5. item 4',
+        {'1. Older (10)': ['1. item 0', '2. item 1', '3. item 2', '4. item 3', '5. item 4',
             '6. item 5', '7. item 6', '8. item 7', '9. item 8', '10. item 9']},
-        {'11 - 12': ['11. item 10', '12. item 11']},
+        {'2. Older (2)': ['1. item 10', '2. item 11']},
     ]);
 });
 
-test('menu: inline items then ranges, starting at zero', () => {
+test('menu: inline items then folders, starting at zero', () => {
     const nodes = buildHistoryNodes(recent(history(5)), {...OPTIONS, inlineLimit: 2, folderLimit: 2, startAtZero: true});
     assertEqual(shape(nodes), [
         'History',
         '0. item 0',
         '1. item 1',
-        {'2 - 3': ['2. item 2', '3. item 3']},
-        {'4 - 4': ['4. item 4']},
+        {'2. Older (2)': ['0. item 2', '1. item 3']},
+        {'3. Older (1)': ['0. item 4']},
     ]);
+    const unnumbered = buildHistoryNodes(recent(history(3)), {...OPTIONS, inlineLimit: 1, markNumbers: false});
+    assertEqual(shape(unnumbered), ['History', 'item 0', {'Older (2)': ['item 1', 'item 2']}]);
 });
 
 test('menu: inline limit larger than history', () => {
@@ -117,14 +119,19 @@ test('menu: main menu order', () => {
     ]);
 });
 
-test('menu: numbering continues from pinned items into history and folders', () => {
+test('menu: numbering continues from pinned items through history to folders', () => {
     const pinned = [{id: 'p0', text: 'pin zero', pinned: true}, {id: 'p1', text: 'pin one', pinned: true}];
-    const nodes = buildHistoryNodes({pinned, recent: history(3)}, {...OPTIONS, inlineLimit: 1, folderLimit: 5});
+    const nodes = buildHistoryNodes({pinned, recent: history(5)}, {...OPTIONS, inlineLimit: 1, folderLimit: 2});
     assertEqual(shape(nodes), [
         'Pinned', '1. pin zero', '2. pin one',
-        'History', '3. item 0', {'4 - 5': ['4. item 1', '5. item 2']},
+        'History', '3. item 0', {'4. Older (2)': ['1. item 1', '2. item 2']}, {'5. Older (2)': ['1. item 3', '2. item 4']},
     ]);
-    assertEqual([...historyNumbers(nodes)], [[1, 'p0'], [2, 'p1'], [3, 'id0'], [4, 'id1'], [5, 'id2']]);
+    const numbers = historyNumbers(nodes);
+    assertEqual([...numbers.keys()], [1, 2, 3, 4, 5]);
+    assertEqual([numbers.get(1), numbers.get(3)], ['p0', 'id0']);
+    assertEqual([...numbers.get(4)], [[1, 'id1'], [2, 'id2']], 'a folder maps its own numbers');
+    assertEqual([...numbers.get(5)], [[1, 'id3'], [2, 'id4']]);
+    assertEqual(historyOrder(numbers), ['p0', 'p1', 'id0', 'id1', 'id2', 'id3', 'id4']);
     assertEqual(nodes.filter(node => node.type === 'history').map(node => node.pinned), [true, true, false]);
 });
 
@@ -137,7 +144,8 @@ test('menu: pinned items stay inline even with inline limit 0', () => {
 
 test('menu: numbers in the main menu ignore snippets', () => {
     const nodes = buildMainMenu({pinned: [], recent: history(2)}, FOLDERS, {...OPTIONS, inlineLimit: 1});
-    assertEqual([...historyNumbers(nodes)], [[1, 'id0'], [2, 'id1']]);
+    assertEqual([...historyNumbers(nodes)].map(([number, entry]) => [number, typeof entry]), [[1, 'string'], [2, 'object']],
+        'snippet folders get no number');
 });
 
 test('number keys: digits, keypad and number-row position', () => {

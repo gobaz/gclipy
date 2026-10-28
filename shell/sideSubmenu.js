@@ -78,6 +78,12 @@ export const SideSubmenuItem = GObject.registerClass({
         return this._panel.visible;
     }
 
+    /** True while the keyboard focus is on an item inside the panel. */
+    get hasFocusInside() {
+        const focus = global.stage.get_key_focus();
+        return !!focus && this._panel.contains(focus);
+    }
+
     _setParent(parent) {
         super._setParent(parent);
         this.menu._setParent(parent);
@@ -105,10 +111,11 @@ export const SideSubmenuItem = GObject.registerClass({
 
     /** Clicking or pressing Enter/Space enters the panel instead of closing the menu. */
     activate(_event) {
-        this._enter();
+        this.enter();
     }
 
-    _enter() {
+    /** Open the panel and move the focus to its first item. */
+    enter() {
         this.setSubmenuShown(true);
         this._focusFirstItem();
     }
@@ -179,7 +186,7 @@ export const SideSubmenuItem = GObject.registerClass({
         const key = event.get_key_symbol();
         // The arrow pointing at the panel enters it; the panel flips left near the screen edge.
         if (key === (this._onLeft ? Clutter.KEY_Left : Clutter.KEY_Right)) {
-            this._enter();
+            this.enter();
             return Clutter.EVENT_STOP;
         }
         // Close before the menu moves the focus, so Up/Down go to the neighbouring menu item

@@ -23,8 +23,9 @@ the same extension API, but those versions are untested.
   recorded.
 - Snippet folders, read from `~/.local/share/gclipy/snippets.json`.
 - Clipy's menu layout:
-  - numbered items, counting continuously from pinned items through history,
-    with older history grouped into "6 - 15", "16 - 25"… submenus
+  - numbered entries, counting continuously from pinned items through history;
+    older history is grouped into folders ("8. Older (10)") that count as one
+    entry each, with the items inside numbered again from 1
   - the 5 most recent items shown directly in the menu (configurable)
   - in the main menu: Pinned, then Snippet, then History (snippets can be moved
     after History in settings)
@@ -38,8 +39,10 @@ the same extension API, but those versions are untested.
   Click the pin again to unpin, or delete the item with the delete modifier.
   Rearrange pinned items with Ctrl+Up / Ctrl+Down on the highlighted item, or
   turn on ▲/▼ buttons under Settings → Menu → "Show ▲/▼ buttons on pinned items".
-- Number keys: while a menu is open, press 1–9 to paste item 1–9, or 0 for
-  item 10, including items inside folders. The keypad works with NumLock on. On
+- Number keys: while a menu is open, press 1–9 to paste entry 1–9, or 0 for
+  entry 10. A folder's number steps into the folder, and the next digit pastes
+  from inside it: "8" then "1" pastes the first item of folder 8. Left goes
+  back to the top level. The keypad works with NumLock on. On
   layouts whose number row types letters (Lithuanian, French…) the keys still
   work by position. You can turn this off under Settings → General → Paste.
 - Selecting an item copies it and pastes it into the focused window. Terminals
